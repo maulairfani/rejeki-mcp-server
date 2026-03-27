@@ -1,112 +1,109 @@
 # Rejeki
 
-AI Personal Finance Agent — bicara natural ke Claude Desktop, Claude yang jadi otaknya.
+AI personal finance agent powered by Claude + MCP. Instead of manually categorizing transactions in a spreadsheet, you just talk to Claude naturally.
 
-## Masalah yang Dipecahkan
+> "Bisa afford PS5 gak bulan ini?"
+> "Berapa yang udah aku keluarin buat makan minggu ini?"
+> "Catat transfer 500 ribu ke GoPay"
 
-Aplikasi keuangan biasa (Money Manager, dll.) bisa track pengeluaran, tapi **tidak bisa jawab pertanyaan nyata**:
+## Core Concept: True Available Money
 
-- "Bisa afford beli ini gak?"
-- "Berapa uang yang *beneran* bisa gue pakai sekarang?"
-- "Kalau beli ini sekarang, saving goal gue kena gak?"
-
-Rejeki menjawab itu semua.
-
-## Konsep Utama: True Available Money
+Most finance apps show your account balance. Rejeki shows what you can **actually** spend:
 
 ```
 True Available = Total Saldo
-              − Alokasi Saving Goals
-              − Kewajiban Tetap belum dibayar
-              − Upcoming Expenses bulan ini
-              − Estimasi sisa budget kategori
+              − Kewajiban tetap yang belum jatuh tempo bulan ini
+              − Upcoming expenses yang belum dibayar
+              − Saving goal allocations
 ```
 
-Bukan sekadar "saldo rekening", tapi uang yang **benar-benar bebas dipakai**.
+## How It Works
 
-## Framework: Pay Yourself First
+Rejeki is an [MCP](https://modelcontextprotocol.io) server. Claude Desktop connects to it and gains access to your financial data through tools. Claude is the brain — Rejeki is just the data layer.
 
 ```
-Income
-  └─ Kewajiban Tetap (cicilan, langganan, dll.)
-       └─ Saving Goals (Emergency Fund → Nikah → Rumah → ...)
-            └─ True Available (baru ini yang boleh dihabiskan)
+You ──── (natural language) ──── Claude Desktop
+                                       │
+                                  MCP tools
+                                       │
+                                   Rejeki
+                                       │
+                                    SQLite
 ```
 
-Saving Goals diprioritaskan: **Emergency Fund selalu #1**.
+## Setup
+
+**Requirements:** Python 3.11+, [miniconda](https://docs.conda.io/en/latest/miniconda.html) or any Python env, Claude Desktop
+
+**1. Install dependencies**
+```bash
+pip install -e .
+```
+
+**2. Add to Claude Desktop config**
+
+File: `%AppData%\Claude\claude_desktop_config.json` (or the equivalent path on your machine)
+
+```json
+{
+  "mcpServers": {
+    "rejeki": {
+      "command": "C:\\path\\to\\python.exe",
+      "args": ["-m", "rejeki.server"],
+      "cwd": "C:\\path\\to\\rejeki"
+    }
+  }
+}
+```
+
+**3. Restart Claude Desktop** (quit from system tray, not just close window)
+
+**4. Verify** — click the "+" icon in Claude Desktop → hover "Connectors" → `rejeki` should appear.
+
+## Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `sqlite:///rejeki.db` | Database path. Use `sqlite:///` prefix or PostgreSQL URL |
+
+## Available Tools (21)
+
+| Tool | Description |
+|---|---|
+| `finance_add_account` | Tambah rekening (bank / ewallet / cash) |
+| `finance_get_accounts` | List semua rekening + saldo |
+| `finance_add_transaction` | Catat pemasukan, pengeluaran, atau transfer |
+| `finance_get_transactions` | Query transaksi dengan filter |
+| `finance_set_budget` | Set budget per kategori per bulan |
+| `finance_get_budget_status` | Cek sisa budget bulan ini |
+| `finance_add_saving_goal` | Buat saving goal baru |
+| `finance_get_saving_goals` | List semua saving goals + progress |
+| `finance_update_saving_goal` | Update progress saving goal |
+| `finance_add_fixed_expense` | Catat kewajiban tetap bulanan (kos, cicilan, dll) |
+| `finance_get_fixed_expenses` | List kewajiban tetap |
+| `finance_add_upcoming_expense` | Catat pengeluaran yang akan datang |
+| `finance_get_upcoming_expenses` | List upcoming expenses |
+| `finance_mark_upcoming_paid` | Tandai upcoming expense sebagai lunas |
+| `finance_manage_wishlist` | Kelola wishlist (list / add / remove) |
+| `finance_add_asset` | Catat aset berdasarkan cost basis |
+| `finance_get_assets` | List semua aset |
+| `finance_get_true_available` | Hitung True Available Money |
+| `finance_can_afford` | Cek apakah bisa afford sejumlah uang |
+| `finance_get_summary` | Ringkasan keuangan bulanan |
+| `finance_get_spending_trend` | Tren pengeluaran N bulan ke belakang |
+
+## Default Categories
+
+Income: Gaji, Freelance, Investasi, Lainnya
+
+Expense: Makan, Transport, Belanja, Hiburan, Kesehatan, Pendidikan, Tagihan, Langganan, Kirim Ortu, Kos/Sewa, Lainnya
 
 ## Stack
 
-| Komponen | Teknologi |
-|----------|-----------|
-| MCP Server | Python + FastMCP |
-| Database | SQLite (dev) → PostgreSQL (prod) |
-| Transport | stdio (dev) → HTTP+OAuth (prod) |
-| AI Client | Claude Desktop |
-
-## Arsitektur
-
-```
-Claude Desktop  ←→  MCP Server (Rejeki)  ←→  SQLite
-     (otak)            (executor)            (data)
-```
-
-MCP server hanya eksekutor — menyimpan dan mengambil data. Semua reasoning, analisis, dan keputusan ada di Claude.
-
-## MCP Tools (15)
-
-| Tool | Fungsi |
-|------|--------|
-| `finance_add_transaction` | Catat transaksi (income/expense/transfer) |
-| `finance_get_true_available` | Hitung True Available Money |
-| `finance_can_afford` | Cek apakah bisa afford sesuatu |
-| `finance_get_summary` | Ringkasan keuangan periode tertentu |
-| `finance_get_accounts` | List semua akun dan saldo |
-| `finance_set_budget` | Set budget per kategori |
-| `finance_get_budget_status` | Status pemakaian budget |
-| `finance_add_saving_goal` | Tambah saving goal baru |
-| `finance_update_saving_goal` | Update progress saving goal |
-| `finance_get_saving_goals` | List semua saving goals |
-| `finance_add_fixed_expense` | Tambah kewajiban tetap |
-| `finance_add_upcoming_expense` | Tambah pengeluaran mendatang |
-| `finance_manage_wishlist` | Kelola wishlist |
-| `finance_add_asset` | Catat aset (dicatat di harga beli) |
-| `finance_get_spending_trend` | Analisis tren pengeluaran |
-
-## Database Schema
-
-```
-accounts          → rekening (BCA, GoPay, Cash, dll.)
-transactions      → semua transaksi (income/expense/transfer)
-categories        → kategori pengeluaran
-budgets           → budget per kategori per bulan
-saving_goals      → tujuan tabungan + prioritas
-fixed_expenses    → kewajiban tetap bulanan
-upcoming_expenses → pengeluaran mendatang yang sudah diketahui
-wishlist          → daftar keinginan
-assets            → aset (dicatat di cost basis, bukan market value)
-```
-
-## Roadmap
-
-- [x] Desain arsitektur & konsep
-- [ ] v1 MVP — local, stdio, SQLite, semua core tools
-- [ ] Testing & validasi dengan data nyata
-- [ ] v2 — HTTP transport + basic auth
-- [ ] v3 — PostgreSQL + multi-device
-
-## Contoh Penggunaan
-
-```
-User: "Gue mau beli sepatu Rp800rb, bisa gak?"
-
-Claude: Gue cek dulu ya...
-        - Saldo total: Rp3.2jt
-        - Saving alokasi bulan ini: Rp1jt
-        - Tagihan listrik belum bayar: Rp350rb
-        - Budget makan sisa: Rp200rb
-
-        True Available lo: Rp1.65jt
-        Sepatu Rp800rb? Bisa, masih sisa Rp850rb.
-        Tapi kalau beli, emergency fund lo mundur ~2 minggu dari target.
-```
+- **Python** + [FastMCP](https://github.com/jlowin/fastmcp)
+- **SQLite** (dev) → PostgreSQL (prod)
+- **Transport:** stdio (dev) → HTTP + OAuth (prod)

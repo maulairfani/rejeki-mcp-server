@@ -1,0 +1,17 @@
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+dist/
+build/
+
+PLAN.md
