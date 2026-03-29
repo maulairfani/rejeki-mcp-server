@@ -1,6 +1,6 @@
 from fastmcp import FastMCP
 from rejeki.database import init_db
-from rejeki.tools import accounts, envelopes, transactions, scheduled, analytics
+from rejeki.tools import accounts, envelopes, transactions, scheduled, analytics, quick_add as _quick_add
 
 init_db()
 mcp = FastMCP("rejeki")
@@ -137,6 +137,21 @@ def finance_move_money(
     period format YYYY-MM (default bulan ini).
     """
     return envelopes.move_money(from_envelope_id, to_envelope_id, amount, period)
+
+
+# ---------------------------------------------------------------------------
+# Quick add
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def finance_quick_add(text: str) -> dict:
+    """
+    Catat pengeluaran dari teks natural language dalam 1 tool call.
+    Otomatis deteksi nominal, rekening, dan envelope.
+    Contoh: 'makan ayam 15k gopay', 'bensin 50rb bca', 'kopi kenangan 35000 dana'
+    Gunakan tool ini sebagai default untuk mencatat pengeluaran sehari-hari.
+    """
+    return _quick_add.quick_add(text)
 
 
 # ---------------------------------------------------------------------------
