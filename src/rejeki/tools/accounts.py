@@ -42,3 +42,48 @@ def delete_account(db: Database, id: int) -> dict:
 
     db.execute("DELETE FROM accounts WHERE id = ?", (id,))
     return {"deleted_id": id, "name": account["name"]}
+
+
+# ---------------------------------------------------------------------------
+# FastMCP provider
+# ---------------------------------------------------------------------------
+
+from mcp.server.fastmcp import FastMCP
+from rejeki.deps import get_user_db
+
+mcp = FastMCP("accounts")
+
+
+@mcp.tool(name="add_account")
+def _add_account_mcp(name: str, type: str, initial_balance: float = 0) -> dict:
+    """Tambah rekening baru. type: bank | ewallet | cash"""
+    with get_user_db() as db:
+        return add_account(db, name, type, initial_balance)
+
+
+@mcp.tool(name="get_accounts")
+def _get_accounts_mcp() -> dict:
+    """List semua rekening beserta saldo dan total keseluruhan."""
+    with get_user_db() as db:
+        return get_accounts(db)
+
+
+@mcp.tool(name="edit_account")
+def _edit_account_mcp(id: int, name: str | None = None, type: str | None = None) -> dict:
+    """Edit nama atau tipe rekening."""
+    with get_user_db() as db:
+        return edit_account(db, id, name, type)
+
+
+@mcp.tool(name="update_balance")
+def _update_balance_mcp(id: int, balance: float) -> dict:
+    """Set saldo rekening langsung (rekonsiliasi manual)."""
+    with get_user_db() as db:
+        return update_balance(db, id, balance)
+
+
+@mcp.tool(name="delete_account")
+def _delete_account_mcp(id: int) -> dict:
+    """Hapus rekening."""
+    with get_user_db() as db:
+        return delete_account(db, id)

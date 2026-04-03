@@ -288,3 +288,113 @@ def get_envelopes(db: Database, period: str | None = None) -> dict:
         "total_assigned": total_assigned,
         "total_available": total_available,
     }
+
+
+# ---------------------------------------------------------------------------
+# FastMCP provider
+# ---------------------------------------------------------------------------
+
+from mcp.server.fastmcp import FastMCP
+from rejeki.deps import get_user_db
+
+mcp = FastMCP("envelopes")
+
+
+@mcp.tool(name="get_groups")
+def _get_groups_mcp() -> list:
+    """List semua kelompok envelope."""
+    with get_user_db() as db:
+        return get_groups(db)
+
+
+@mcp.tool(name="add_group")
+def _add_group_mcp(name: str, sort_order: int = 0) -> dict:
+    """Tambah kelompok envelope baru."""
+    with get_user_db() as db:
+        return add_group(db, name, sort_order)
+
+
+@mcp.tool(name="get_envelopes")
+def _get_envelopes_mcp(period: str | None = None) -> dict:
+    """
+    Tampilkan semua envelope.
+    Income sources: referensi untuk mencatat pemasukan.
+    Expense envelopes per kelompok: carryover, assigned, activity, available, target.
+    period format YYYY-MM (default bulan ini).
+    """
+    with get_user_db() as db:
+        return get_envelopes(db, period)
+
+
+@mcp.tool(name="add_envelope")
+def _add_envelope_mcp(name: str, type: str, icon: str | None = None, group_id: int | None = None) -> dict:
+    """
+    Tambah envelope baru. type: income | expense.
+    group_id untuk expense (opsional — tanpa group masuk kelompok 'Lainnya').
+    """
+    with get_user_db() as db:
+        return add_envelope(db, name, type, icon, group_id)
+
+
+@mcp.tool(name="edit_envelope")
+def _edit_envelope_mcp(
+    id: int,
+    name: str | None = None,
+    icon: str | None = None,
+    group_id: int | None = None,
+) -> dict:
+    """Edit envelope. Isi hanya field yang mau diubah."""
+    with get_user_db() as db:
+        return edit_envelope(db, id, name, icon, group_id)
+
+
+@mcp.tool(name="delete_envelope")
+def _delete_envelope_mcp(id: int) -> dict:
+    """Hapus envelope beserta semua data budgetnya."""
+    with get_user_db() as db:
+        return delete_envelope(db, id)
+
+
+@mcp.tool(name="set_target")
+def _set_target_mcp(
+    envelope_id: int,
+    target_type: str,
+    target_amount: float | None = None,
+    target_deadline: str | None = None,
+) -> dict:
+    """
+    Set funding target pada envelope expense.
+    target_type: 'monthly' — assign X setiap bulan.
+                 'goal'    — kumpulkan X sampai deadline.
+    target_deadline format YYYY-MM-DD, hanya untuk goal.
+    """
+    with get_user_db() as db:
+        return set_target(db, envelope_id, target_type, target_amount, target_deadline)
+
+
+@mcp.tool(name="assign_to_envelope")
+def _assign_to_envelope_mcp(envelope_id: int, amount: float, period: str | None = None) -> dict:
+    """
+    Assign uang dari Ready to Assign ke envelope.
+    Ini operasi inti Rejeki: 'give every rupiah a job'.
+    Memanggil ini lagi pada period yang sama akan menimpa assigned sebelumnya.
+    period format YYYY-MM (default bulan ini).
+    """
+    with get_user_db() as db:
+        return assign_to_envelope(db, envelope_id, amount, period)
+
+
+@mcp.tool(name="move_money")
+def _move_money_mcp(
+    from_envelope_id: int,
+    to_envelope_id: int,
+    amount: float,
+    period: str | None = None,
+) -> dict:
+    """
+    Pindahkan uang antar envelope dalam satu period.
+    Dipakai saat overspend di satu envelope dan perlu ditutup dari envelope lain.
+    period format YYYY-MM (default bulan ini).
+    """
+    with get_user_db() as db:
+        return move_money(db, from_envelope_id, to_envelope_id, amount, period)

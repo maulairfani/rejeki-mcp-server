@@ -174,3 +174,75 @@ def get_transactions(
             LIMIT ?""",
         tuple(params),
     )
+
+
+# ---------------------------------------------------------------------------
+# FastMCP provider
+# ---------------------------------------------------------------------------
+
+from mcp.server.fastmcp import FastMCP
+from rejeki.deps import get_user_db
+
+mcp = FastMCP("transactions")
+
+
+@mcp.tool(name="add_transaction")
+def _add_transaction_mcp(
+    amount: float,
+    type: str,
+    account_id: int,
+    envelope_id: int | None = None,
+    to_account_id: int | None = None,
+    payee: str | None = None,
+    memo: str | None = None,
+    transaction_date: str | None = None,
+) -> dict:
+    """
+    Catat transaksi baru.
+    type: income | expense | transfer.
+    transaction_date format YYYY-MM-DD (default hari ini).
+    """
+    with get_user_db() as db:
+        return add_transaction(db, amount, type, account_id, envelope_id, to_account_id, payee, memo, transaction_date)
+
+
+@mcp.tool(name="get_transactions")
+def _get_transactions_mcp(
+    account_id: int | None = None,
+    envelope_id: int | None = None,
+    type: str | None = None,
+    payee: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = 50,
+) -> list:
+    """
+    Query transaksi. Semua filter opsional dan bisa dikombinasikan.
+    payee: partial match (misal 'Grab' cocok dengan 'GrabFood').
+    """
+    with get_user_db() as db:
+        return get_transactions(db, account_id, envelope_id, type, payee, date_from, date_to, limit)
+
+
+@mcp.tool(name="edit_transaction")
+def _edit_transaction_mcp(
+    id: int,
+    amount: float | None = None,
+    type: str | None = None,
+    account_id: int | None = None,
+    envelope_id: int | None = None,
+    to_account_id: int | None = None,
+    payee: str | None = None,
+    memo: str | None = None,
+    transaction_date: str | None = None,
+) -> dict:
+    """Edit transaksi yang sudah ada. Isi hanya field yang mau diubah."""
+    with get_user_db() as db:
+        return edit_transaction(db, id, amount, type, account_id, envelope_id, to_account_id, payee, memo, transaction_date)
+
+
+@mcp.tool(name="delete_transaction")
+def _delete_transaction_mcp(id: int) -> dict:
+    """Hapus transaksi dan balikkan efeknya ke saldo rekening."""
+    with get_user_db() as db:
+        return delete_transaction(db, id)

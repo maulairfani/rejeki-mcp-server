@@ -116,3 +116,68 @@ def delete_scheduled_transaction(db: Database, id: int) -> dict:
         raise ValueError(f"Scheduled transaction id={id} tidak ditemukan")
     db.execute("DELETE FROM scheduled_transactions WHERE id = ?", (id,))
     return {"deleted_id": id, "payee": sched["payee"]}
+
+
+# ---------------------------------------------------------------------------
+# FastMCP provider
+# ---------------------------------------------------------------------------
+
+from mcp.server.fastmcp import FastMCP
+from rejeki.deps import get_user_db
+
+mcp = FastMCP("scheduled")
+
+
+@mcp.tool(name="add_scheduled_transaction")
+def _add_scheduled_mcp(
+    amount: float,
+    type: str,
+    account_id: int,
+    scheduled_date: str,
+    envelope_id: int | None = None,
+    to_account_id: int | None = None,
+    payee: str | None = None,
+    memo: str | None = None,
+    recurrence: str = "once",
+) -> dict:
+    """
+    Jadwalkan transaksi di masa depan.
+    recurrence: once | weekly | monthly | yearly.
+    scheduled_date format YYYY-MM-DD.
+    """
+    with get_user_db() as db:
+        return add_scheduled_transaction(db, amount, type, account_id, scheduled_date, envelope_id, to_account_id, payee, memo, recurrence)
+
+
+@mcp.tool(name="get_scheduled_transactions")
+def _get_scheduled_mcp(include_inactive: bool = False) -> list:
+    """List transaksi terjadwal, termasuk field days_until (berapa hari lagi)."""
+    with get_user_db() as db:
+        return get_scheduled_transactions(db, include_inactive)
+
+
+@mcp.tool(name="approve_scheduled_transaction")
+def _approve_scheduled_mcp(id: int) -> dict:
+    """
+    Eksekusi scheduled transaction sebagai transaksi nyata.
+    Jika recurring, otomatis jadwalkan ke occurrence berikutnya.
+    """
+    with get_user_db() as db:
+        return approve_scheduled_transaction(db, id)
+
+
+@mcp.tool(name="skip_scheduled_transaction")
+def _skip_scheduled_mcp(id: int) -> dict:
+    """
+    Lewati occurrence ini tanpa mencatat transaksi.
+    Jika recurring, maju ke occurrence berikutnya.
+    """
+    with get_user_db() as db:
+        return skip_scheduled_transaction(db, id)
+
+
+@mcp.tool(name="delete_scheduled_transaction")
+def _delete_scheduled_mcp(id: int) -> dict:
+    """Hapus scheduled transaction sepenuhnya."""
+    with get_user_db() as db:
+        return delete_scheduled_transaction(db, id)

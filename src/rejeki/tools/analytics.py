@@ -232,3 +232,58 @@ def get_onboarding_status(db: Database) -> dict:
         "next": next_step,
         "ready_to_assign": rta if has_accounts else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# FastMCP provider
+# ---------------------------------------------------------------------------
+
+from mcp.server.fastmcp import FastMCP
+from rejeki.deps import get_user_db
+
+mcp = FastMCP("analytics")
+
+
+@mcp.tool(name="get_onboarding_status")
+def _get_onboarding_status_mcp() -> dict:
+    """
+    Cek status onboarding: rekening, targets, envelope assignment, RTA.
+    Panggil ini di awal setiap sesi baru.
+    """
+    with get_user_db() as db:
+        return get_onboarding_status(db)
+
+
+@mcp.tool(name="get_ready_to_assign")
+def _get_ready_to_assign_mcp(period: str | None = None) -> dict:
+    """
+    Hitung Ready to Assign = total saldo rekening − total available semua envelope.
+    Target: nol. Setiap rupiah harus punya tugas.
+    period format YYYY-MM (default bulan ini).
+    """
+    with get_user_db() as db:
+        return get_ready_to_assign(db, period)
+
+
+@mcp.tool(name="get_age_of_money")
+def _get_age_of_money_mcp() -> dict:
+    """
+    Hitung Age of Money: rata-rata berapa hari uang duduk sebelum dipakai.
+    Dihitung FIFO. Target: 30+ hari.
+    """
+    with get_user_db() as db:
+        return get_age_of_money(db)
+
+
+@mcp.tool(name="get_summary")
+def _get_summary_mcp(period: str | None = None) -> dict:
+    """Ringkasan bulanan: income, expense, net, breakdown per envelope. period: YYYY-MM."""
+    with get_user_db() as db:
+        return get_summary(db, period)
+
+
+@mcp.tool(name="get_spending_trend")
+def _get_spending_trend_mcp(envelope_id: int | None = None, months: int = 3) -> list:
+    """Tren pengeluaran per envelope, N bulan ke belakang."""
+    with get_user_db() as db:
+        return get_spending_trend(db, envelope_id, months)
