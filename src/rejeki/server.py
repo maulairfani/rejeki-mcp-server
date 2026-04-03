@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 from urllib.parse import quote
 
 import httpx
@@ -12,6 +11,8 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Mount, Route
 
 from rejeki.deps import _db_path
+from rejeki.prompts.budget import mcp as _budget_prompts_mcp
+from rejeki.prompts.onboarding import mcp as _onboarding_prompts_mcp
 from rejeki.tools.accounts import mcp as _accounts_mcp
 from rejeki.tools.analytics import mcp as _analytics_mcp
 from rejeki.tools.apps import mcp as _apps_mcp
@@ -118,55 +119,8 @@ mcp.mount(_scheduled_mcp,    namespace="finance")
 mcp.mount(_analytics_mcp,    namespace="finance")
 mcp.mount(_apps_mcp)
 mcp.mount(_wishlist_mcp,     namespace="finance")
-
-
-# ---------------------------------------------------------------------------
-# Prompts
-# ---------------------------------------------------------------------------
-
-@mcp.prompt()
-def budget_review(period: str | None = None) -> str:
-    """Review budget bulanan: analisis overspend dan saran rebalancing."""
-    p = period or datetime.now().strftime("%Y-%m")
-    return (
-        f"Lakukan review budget bulan {p}:\n\n"
-        f"1. Panggil finance_get_summary(period='{p}') untuk ringkasan income, expense, dan net.\n"
-        f"2. Panggil finance_get_envelopes(period='{p}') untuk detail setiap envelope "
-        f"(carryover, assigned, activity, available).\n"
-        f"3. Identifikasi envelope yang overspend (available negatif).\n"
-        f"4. Berikan ringkasan: envelope mana yang konsisten, mana yang perlu perhatian.\n"
-        f"5. Cek finance_get_ready_to_assign(period='{p}') — jika ada RTA tersisa, sarankan alokasi ke envelope yang kekurangan."
-    )
-
-
-@mcp.prompt()
-def monthly_planning(period: str | None = None) -> str:
-    """Panduan distribusi budget awal bulan: cek RTA, lihat targets, assign hingga RTA = 0."""
-    p = period or datetime.now().strftime("%Y-%m")
-    return (
-        f"Bantu planning budget bulan {p}:\n\n"
-        f"1. Panggil finance_get_ready_to_assign(period='{p}') — lihat berapa uang yang belum dialokasikan.\n"
-        f"2. Panggil finance_get_envelopes(period='{p}') — lihat target setiap envelope dan available saat ini.\n"
-        f"3. Prioritaskan envelope dengan target 'monthly' yang belum terpenuhi.\n"
-        f"4. Untuk envelope 'goal', cek apakah on track menuju deadline.\n"
-        f"5. Distribusikan RTA ke envelope yang paling butuh hingga RTA = 0.\n"
-        f"Gunakan finance_assign_to_envelope untuk setiap alokasi. Tanya user jika ada prioritas khusus."
-    )
-
-
-@mcp.prompt()
-def onboarding_guide() -> str:
-    """Wizard setup Rejeki dari awal: rekening → envelope → budget."""
-    return (
-        "Bantu setup Rejeki dari awal:\n\n"
-        "1. Baca finance://onboarding-status untuk melihat progress saat ini.\n"
-        "2. Jika belum ada rekening: tambah dengan finance_add_account (type: bank | ewallet | cash).\n"
-        "3. Buat kelompok envelope dengan finance_add_group (contoh: Kebutuhan, Keinginan, Tabungan).\n"
-        "4. Buat envelope untuk setiap kategori dengan finance_add_envelope (type: income | expense).\n"
-        "5. Set target dengan finance_set_target untuk envelope yang punya target bulanan atau goal.\n"
-        "6. Assign budget ke setiap envelope dengan finance_assign_to_envelope hingga RTA = 0.\n\n"
-        "Tanyakan user mau mulai dari step mana, atau ikuti step berikutnya yang belum selesai."
-    )
+mcp.mount(_budget_prompts_mcp)
+mcp.mount(_onboarding_prompts_mcp)
 
 
 # ---------------------------------------------------------------------------
