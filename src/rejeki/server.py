@@ -14,10 +14,22 @@ from rejeki.tools import quick_add as _quick_add
 load_dotenv()
 init_platform_db()
 
-auth = AuthKitProvider(
-    authkit_domain=os.environ["AUTHKIT_DOMAIN"],
-    base_url=os.environ.get("BASE_URL", "http://localhost:8000"),
-)
+_test_token = os.environ.get("TEST_TOKEN")
+if _test_token:
+    from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
+    auth = StaticTokenVerifier(
+        tokens={
+            _test_token: {
+                "client_id": "test-user-eval-001",
+                "scopes": ["read", "write"],
+            }
+        }
+    )
+else:
+    auth = AuthKitProvider(
+        authkit_domain=os.environ["AUTHKIT_DOMAIN"],
+        base_url=os.environ.get("BASE_URL", "http://localhost:8000"),
+    )
 
 mcp = FastMCP("rejeki", auth=auth)
 

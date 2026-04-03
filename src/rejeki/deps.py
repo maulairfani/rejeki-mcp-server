@@ -13,9 +13,9 @@ async def get_user_db(ctx: Context):
     if not token:
         raise RuntimeError("Token tidak ditemukan — pastikan AuthKitProvider terkonfigurasi")
 
-    workos_id = token.claims.get("sub")
+    workos_id = token.claims.get("sub") or token.claims.get("client_id")
     if not workos_id:
-        raise RuntimeError("Token tidak mengandung claim 'sub'")
+        raise RuntimeError("Token tidak mengandung claim 'sub' atau 'client_id'")
 
     user = get_user_by_workos_id(workos_id)
     if not user:

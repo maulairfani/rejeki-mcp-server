@@ -1,0 +1,51 @@
+<evaluation>
+   <qa_pair>
+      <question>Dari Januari hingga Maret 2025, bulan mana yang memiliki total pengeluaran (expense) tertinggi? Jawab dengan format YYYY-MM.</question>
+      <answer>2025-03</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Siapa payee yang paling sering muncul dalam catatan pengeluaran di envelope Makan selama Q1 2025 (Januari sampai Maret)? Jawab dengan nama payee-nya persis.</question>
+      <answer>Warteg Pak Dhe</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Berapa selisih antara total income dan total pengeluaran (expense) di bulan Maret 2025? Jawab dengan angka bulat tanpa pemisah ribuan (positif jika income lebih besar dari expense).</question>
+      <answer>5138000</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Envelope mana yang mengalami underspend terbesar di Maret 2025, yaitu selisih antara jumlah yang di-assign dan actual spending-nya paling besar? Sebutkan nama envelope-nya.</question>
+      <answer>Makan</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Berapa total pengeluaran untuk kategori Transport sepanjang Q1 2025 (Januari hingga Maret)? Jawab dengan angka bulat tanpa pemisah ribuan.</question>
+      <answer>350000</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Siapa yang membayar freelance income pada Maret 2025? Sebutkan nama payee-nya persis.</question>
+      <answer>PT Desain Kreatif</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Rekening mana yang memiliki saldo terendah saat ini di antara semua rekening yang terdaftar? Sebutkan nama rekeningnya persis.</question>
+      <answer>Tunai</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Berapa nominal transaksi terjadwal (scheduled transaction) yang bersifat monthly dengan jumlah terbesar? Jawab dengan angka bulat tanpa pemisah ribuan.</question>
+      <answer>1500000</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Di bulan mana jumlah transaksi di envelope Makan paling banyak selama Q1 2025? Jawab dengan format YYYY-MM.</question>
+      <answer>2025-01</answer>
+   </qa_pair>
+
+   <qa_pair>
+      <question>Berapa total yang dibayarkan ke payee Shopee selama Januari hingga Maret 2025? Jawab dengan angka bulat tanpa pemisah ribuan.</question>
+      <answer>570000</answer>
+   </qa_pair>
+</evaluation>
