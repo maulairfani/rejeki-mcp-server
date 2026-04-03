@@ -16,6 +16,12 @@ __pycache__/
 .venv/
 dist/
 build/
+apps/*/.venv/
+apps/*/dist/
+apps/*/*.egg-info/
 
 PLAN.md
 DEPLOY.md
+
+# Claude Code local settings
+.claude/

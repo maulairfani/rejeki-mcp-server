@@ -42,7 +42,9 @@ logger = logging.getLogger(__name__)
 
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 
-USERS_FILE = os.environ.get("USERS_CONFIG", str(Path(__file__).parent / "users.json"))
+USERS_FILE = os.environ.get("USERS_CONFIG")
+if not USERS_FILE:
+    raise RuntimeError("USERS_CONFIG env var must be set to the path of users.json")
 AS_BASE_URL = os.environ.get("AS_BASE_URL", "https://maulairfani.my.id/rejeki/auth")
 MCP_SCOPE = "rejeki"
 
@@ -307,9 +309,14 @@ def create_app() -> Starlette:
 
 app = create_app()
 
-if __name__ == "__main__":
+
+def main():
     import uvicorn
     port = int(os.environ.get("AUTH_PORT", 9004))
     logging.basicConfig(level=logging.INFO)
     print(f"Rejeki Auth Server on port {port}")
-    uvicorn.run("auth_server:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("rejeki_auth.server:app", host="0.0.0.0", port=port, reload=False)
+
+
+if __name__ == "__main__":
+    main()

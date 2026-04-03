@@ -1,5 +1,5 @@
 from datetime import date
-from rejeki.database import Database
+from rejeki_mcp.database import Database
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ def get_envelopes(db: Database, period: str | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
-from rejeki.deps import get_user_db
+from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("envelopes")
 

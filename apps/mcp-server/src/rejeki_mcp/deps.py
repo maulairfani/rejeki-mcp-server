@@ -3,7 +3,7 @@ import sqlite3
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from rejeki.database import Database, init_db
+from rejeki_mcp.database import Database, init_db
 
 # Set per-request by RejekiTokenVerifier after successful token introspection.
 _db_path: ContextVar[str] = ContextVar("db_path")

@@ -1,7 +1,7 @@
 import calendar
 from datetime import date, timedelta
-from rejeki.database import Database
-from rejeki.tools.transactions import add_transaction
+from rejeki_mcp.database import Database
+from rejeki_mcp.tools.transactions import add_transaction
 
 
 def _next_date(date_str: str, recurrence: str) -> str:
@@ -123,7 +123,7 @@ def delete_scheduled_transaction(db: Database, id: int) -> dict:
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
-from rejeki.deps import get_user_db
+from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("scheduled")
 

@@ -1,11 +1,11 @@
 [project]
-name = "rejeki"
+name = "rejeki_mcp"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = ["fastmcp", "httpx", "python-dotenv"]
 
 [project.scripts]
-rejeki = "rejeki.server:main"
+rejeki = "rejeki_mcp.server:main"
 
 [build-system]
 requires = ["setuptools>=42"]

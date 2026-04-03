@@ -10,16 +10,16 @@ from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Mount, Route
 
-from rejeki.deps import _db_path
-from rejeki.prompts.budget import mcp as _budget_prompts_mcp
-from rejeki.prompts.onboarding import mcp as _onboarding_prompts_mcp
-from rejeki.tools.accounts import mcp as _accounts_mcp
-from rejeki.tools.analytics import mcp as _analytics_mcp
-from rejeki.tools.apps import mcp as _apps_mcp
-from rejeki.tools.envelopes import mcp as _envelopes_mcp
-from rejeki.tools.scheduled import mcp as _scheduled_mcp
-from rejeki.tools.transactions import mcp as _transactions_mcp
-from rejeki.tools.wishlist import mcp as _wishlist_mcp
+from rejeki_mcp.deps import _db_path
+from rejeki_mcp.prompts.budget import mcp as _budget_prompts_mcp
+from rejeki_mcp.prompts.onboarding import mcp as _onboarding_prompts_mcp
+from rejeki_mcp.tools.accounts import mcp as _accounts_mcp
+from rejeki_mcp.tools.analytics import mcp as _analytics_mcp
+from rejeki_mcp.tools.apps import mcp as _apps_mcp
+from rejeki_mcp.tools.envelopes import mcp as _envelopes_mcp
+from rejeki_mcp.tools.scheduled import mcp as _scheduled_mcp
+from rejeki_mcp.tools.transactions import mcp as _transactions_mcp
+from rejeki_mcp.tools.wishlist import mcp as _wishlist_mcp
 
 load_dotenv()
 
@@ -142,7 +142,7 @@ def main():
     import uvicorn
     port = int(os.environ.get("PORT", 8001))
     uvicorn.run(
-        "rejeki.server:app",
+        "rejeki_mcp.server:app",
         host="0.0.0.0",
         port=port,
         reload=False,

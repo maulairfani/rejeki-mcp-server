@@ -1,4 +1,4 @@
-from rejeki.database import Database
+from rejeki_mcp.database import Database
 
 
 def add_wishlist_item(db: Database, name: str, price: float | None = None, priority: str = "medium", url: str | None = None, notes: str | None = None) -> dict:
@@ -58,7 +58,7 @@ def delete_wishlist_item(db: Database, id: int) -> dict:
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
-from rejeki.deps import get_user_db
+from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("wishlist")
 

@@ -2,9 +2,9 @@ from datetime import date
 from pathlib import Path
 
 from fastmcp import FastMCP
-from rejeki.deps import get_user_db
-from rejeki.tools.analytics import get_ready_to_assign
-from rejeki.tools.envelopes import get_envelopes
+from rejeki_mcp.deps import get_user_db
+from rejeki_mcp.tools.analytics import get_ready_to_assign
+from rejeki_mcp.tools.envelopes import get_envelopes
 
 _UI_FILE = Path(__file__).parent.parent / "ui" / "budget-allocator.html"
 
