@@ -116,7 +116,7 @@ mcp.mount(_envelopes_mcp,    namespace="finance")
 mcp.mount(_transactions_mcp, namespace="finance")
 mcp.mount(_scheduled_mcp,    namespace="finance")
 mcp.mount(_analytics_mcp,    namespace="finance")
-mcp.mount(_apps_mcp,         namespace="finance")
+mcp.mount(_apps_mcp)
 mcp.mount(_wishlist_mcp,     namespace="finance")
 
 

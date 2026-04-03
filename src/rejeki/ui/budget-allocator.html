@@ -229,7 +229,7 @@ function render(data) {
       if (v === data.period) o.selected = true;
       sel.add(o);
     }
-    sel.onchange = () => callTool('finance_budget_allocator', { period: sel.value });
+    sel.onchange = () => callTool('budget_allocator', { period: sel.value });
   }
 
   // Envelopes
