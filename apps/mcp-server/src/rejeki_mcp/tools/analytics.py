@@ -239,51 +239,58 @@ def get_onboarding_status(db: Database) -> dict:
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
+from fastmcp.server.context import Context
+from fastmcp.server.dependencies import CurrentContext
 from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("analytics")
 
 
 @mcp.tool(name="get_onboarding_status")
-def _get_onboarding_status_mcp() -> dict:
+async def _get_onboarding_status_mcp(ctx: Context = CurrentContext()) -> dict:
     """
     Check onboarding status: accounts, targets, envelope assignments, RTA.
     Call this at the start of each new session.
     """
+    await ctx.info("get_onboarding_status")
     with get_user_db() as db:
         return get_onboarding_status(db)
 
 
 @mcp.tool(name="get_ready_to_assign")
-def _get_ready_to_assign_mcp(period: str | None = None) -> dict:
+async def _get_ready_to_assign_mcp(period: str | None = None, ctx: Context = CurrentContext()) -> dict:
     """
     Calculate Ready to Assign = total account balance - total available across all envelopes.
     Target: zero. Every rupiah should have a job.
     period format YYYY-MM (defaults to current month).
     """
+    await ctx.info(f"get_ready_to_assign: period={period}")
     with get_user_db() as db:
         return get_ready_to_assign(db, period)
 
 
 @mcp.tool(name="get_age_of_money")
-def _get_age_of_money_mcp() -> dict:
+async def _get_age_of_money_mcp(ctx: Context = CurrentContext()) -> dict:
     """
     Calculate Age of Money: average number of days money sits before being spent.
     Calculated using FIFO. Target: 30+ days.
     """
+    await ctx.info("get_age_of_money")
     with get_user_db() as db:
         return get_age_of_money(db)
 
 
 @mcp.tool(name="get_summary")
-def _get_summary_mcp(period: str | None = None) -> dict:
+async def _get_summary_mcp(period: str | None = None, ctx: Context = CurrentContext()) -> dict:
     """Monthly summary: income, expense, net, breakdown per envelope. period: YYYY-MM."""
+    await ctx.info(f"get_summary: period={period}")
     with get_user_db() as db:
         return get_summary(db, period)
 
 
 @mcp.tool(name="get_spending_trend")
-def _get_spending_trend_mcp(envelope_id: int | None = None, months: int = 3) -> list:
+async def _get_spending_trend_mcp(envelope_id: int | None = None, months: int = 3, ctx: Context = CurrentContext()) -> list:
     """Spending trend per envelope, N months back."""
+    await ctx.info(f"get_spending_trend: envelope={envelope_id}, months={months}")
     with get_user_db() as db:
         return get_spending_trend(db, envelope_id, months)

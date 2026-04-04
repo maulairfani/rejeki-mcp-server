@@ -82,8 +82,12 @@ def main():
 
     load_dotenv()
     port = int(os.environ.get("PLATFORM_PORT", 8002))
-    logging.basicConfig(level=logging.INFO)
-    print(f"Rejeki Platform on port {port}")
+    from pythonjsonlogger.json import JsonFormatter
+    handler = logging.StreamHandler()
+    handler.setFormatter(JsonFormatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    logging.root.handlers = [handler]
+    logging.root.setLevel(logging.INFO)
+    logging.getLogger("rejeki_platform").info("server_start", extra={"port": port})
     uvicorn.run("rejeki_platform.server:app", host="0.0.0.0", port=port, reload=False)
 
 

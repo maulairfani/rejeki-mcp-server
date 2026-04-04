@@ -69,7 +69,7 @@ MCP server health check:
 curl http://localhost:8001/health
 ```
 
-Platform dashboard: open `http://localhost:8002` in your browser, log in with credentials from `users.json`.
+Platform dashboard: open `http://localhost:8002` in your browser, log in with credentials from `users.db`.
 
 ### 4. Connect to MCP client (local)
 
@@ -96,28 +96,14 @@ pip install -e apps/mcp-server
 pip install -e apps/auth-server
 ```
 
-### 2. Create `users.json`
-
-```bash
-cp users.example.json users.json
-```
-
-Edit `users.json` — set username, password, and path to user's SQLite file:
-
-```json
-{
-  "irfani": {
-    "password": "your-password",
-    "db": "/root/rejeki-mcp-server/users/irfani.db"
-  }
-}
-```
-
-Create the user database directory:
+### 2. Create users
 
 ```bash
 mkdir -p users
+python scripts/add_user.py irfani your-password --db-path /root/rejeki-mcp-server/users/irfani.db
 ```
+
+This creates `users.db` with bcrypt-hashed credentials.
 
 ### 3. Create `.env` file
 
@@ -131,12 +117,12 @@ Fill `.env` with your domain:
 MCP_BASE_URL=https://your-domain.com/rejeki/mcp
 AS_BASE_URL=https://your-domain.com/rejeki/auth
 INTROSPECT_URL=http://127.0.0.1:9004/introspect
-USERS_CONFIG=/root/rejeki-mcp-server/users.json
+USERS_DB=/root/rejeki-mcp-server/users.db
 PORT=8001
 AUTH_PORT=9004
 ```
 
-> `USERS_CONFIG` must be set explicitly — there is no default fallback.
+> `USERS_DB` must be set explicitly — there is no default fallback.
 
 ### 4. Create systemd service for Auth Server
 
@@ -255,24 +241,19 @@ nginx -t && systemctl reload nginx
 
 ### Add a new user
 
-Edit `scripts/add_user.py`, set `USERNAME`, `PASSWORD`, and `DB_PATH`, then run:
+```bash
+python scripts/add_user.py new_username their-password
+```
+
+This hashes the password with bcrypt and stores it in `users.db`. Default db_path: `./users/<username>.db`.
+
+To specify a custom db path:
 
 ```bash
-python scripts/add_user.py
+python scripts/add_user.py new_username their-password --db-path /path/to/new_username.db
 ```
 
-Or edit `users.json` directly:
-
-```json
-{
-  "new_username": {
-    "password": "their-password",
-    "db": "/root/rejeki-mcp-server/users/new_username.db"
-  }
-}
-```
-
-> Changes to `users.json` take effect immediately without restarting services.
+> Changes take effect immediately without restarting services.
 
 ---
 

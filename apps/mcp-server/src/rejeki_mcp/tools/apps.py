@@ -24,7 +24,7 @@ def _budget_allocator_ui() -> str:
     name="budget_allocator",
     meta={"ui": {"resourceUri": "ui://rejeki/budget-allocator"}},
 )
-def _budget_allocator_mcp(period: str | None = None) -> dict:
+async def _budget_allocator_mcp(period: str | None = None) -> dict:
     """
     Open Budget Allocator — interactive UI to view and assign budget to all envelopes.
     Shows Ready to Assign and all envelopes. Users can assign directly from the UI.

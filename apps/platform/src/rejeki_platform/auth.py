@@ -1,7 +1,9 @@
-import json
+import logging
 import os
+import sqlite3
 from pathlib import Path
 
+import bcrypt
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -9,6 +11,8 @@ from fastapi.templating import Jinja2Templates
 auth_router = APIRouter()
 
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+logger = logging.getLogger("rejeki_platform")
 
 
 class NotAuthenticated(Exception):
@@ -23,16 +27,26 @@ def require_user(request: Request) -> str:
 
 
 def _check_credentials(username: str, password: str) -> bool:
-    users_file = os.environ.get("USERS_CONFIG")
-    if not users_file:
+    users_db = os.environ.get("USERS_DB")
+    if not users_db:
         return False
     try:
-        with open(users_file) as f:
-            users = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+        conn = sqlite3.connect(users_db)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        conn.close()
+    except Exception:
         return False
-    user = users.get(username)
-    return user is not None and user.get("password") == password
+    if not row:
+        logger.warning("login_failed", extra={"username": username, "reason": "unknown_user"})
+        return False
+    if not bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
+        logger.warning("login_failed", extra={"username": username, "reason": "bad_password"})
+        return False
+    logger.info("login_success", extra={"username": username})
+    return True
 
 
 @auth_router.get("/login")

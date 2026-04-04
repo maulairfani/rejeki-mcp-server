@@ -8,6 +8,8 @@ dependencies = [
     "jinja2",
     "python-dotenv",
     "itsdangerous",
+    "bcrypt",
+    "python-json-logger",
 ]
 
 [project.scripts]

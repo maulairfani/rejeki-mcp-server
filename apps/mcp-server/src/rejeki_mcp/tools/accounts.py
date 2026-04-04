@@ -49,41 +49,48 @@ def delete_account(db: Database, id: int) -> dict:
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
+from fastmcp.server.context import Context
+from fastmcp.server.dependencies import CurrentContext
 from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("accounts")
 
 
 @mcp.tool(name="add_account")
-def _add_account_mcp(name: str, type: str, initial_balance: float = 0) -> dict:
+async def _add_account_mcp(name: str, type: str, initial_balance: float = 0, ctx: Context = CurrentContext()) -> dict:
     """Add a new account. type: bank | ewallet | cash"""
+    await ctx.info(f"add_account: name={name}, type={type}, balance={initial_balance}")
     with get_user_db() as db:
         return add_account(db, name, type, initial_balance)
 
 
 @mcp.tool(name="get_accounts")
-def _get_accounts_mcp() -> dict:
+async def _get_accounts_mcp(ctx: Context = CurrentContext()) -> dict:
     """List all accounts with balances and total."""
+    await ctx.info("get_accounts")
     with get_user_db() as db:
         return get_accounts(db)
 
 
 @mcp.tool(name="edit_account")
-def _edit_account_mcp(id: int, name: str | None = None, type: str | None = None) -> dict:
+async def _edit_account_mcp(id: int, name: str | None = None, type: str | None = None, ctx: Context = CurrentContext()) -> dict:
     """Edit account name or type."""
+    await ctx.info(f"edit_account: id={id}")
     with get_user_db() as db:
         return edit_account(db, id, name, type)
 
 
 @mcp.tool(name="update_balance")
-def _update_balance_mcp(id: int, balance: float) -> dict:
+async def _update_balance_mcp(id: int, balance: float, ctx: Context = CurrentContext()) -> dict:
     """Set account balance directly (manual reconciliation)."""
+    await ctx.info(f"update_balance: id={id}, balance={balance}")
     with get_user_db() as db:
         return update_balance(db, id, balance)
 
 
 @mcp.tool(name="delete_account")
-def _delete_account_mcp(id: int) -> dict:
+async def _delete_account_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
     """Delete an account."""
+    await ctx.info(f"delete_account: id={id}")
     with get_user_db() as db:
         return delete_account(db, id)

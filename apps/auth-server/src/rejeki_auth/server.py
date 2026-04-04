@@ -1,25 +1,26 @@
 """
-Rejeki MCP — Authorization Server
-Handles OAuth 2.1 flow for claude.ai integration.
+Finance MCP — Authorization Server
+Handles OAuth 2.1 flow for MCP client integration.
 
 Flow:
-  claude.ai → /auth/.well-known/oauth-authorization-server  (discovery)
-  claude.ai → /auth/register                                 (dynamic client reg)
-  claude.ai → /auth/authorize  → browser login form
-  user      → POST /auth/login/callback  (username + password)
-  claude.ai → /auth/token                                    (code → token)
-  mcp server→ /auth/introspect                               (token validation)
+  MCP client → /auth/.well-known/oauth-authorization-server  (discovery)
+  MCP client → /auth/register                                 (dynamic client reg)
+  MCP client → /auth/authorize  → browser login form
+  user       → POST /auth/login/callback  (username + password)
+  MCP client → /auth/token                                    (code → token)
+  mcp server → /auth/introspect                               (token validation)
 """
 
-import json
 import logging
 import os
 import secrets
+import sqlite3
 import time
-from pathlib import Path
 from typing import Any
 
+import bcrypt
 from pydantic import AnyHttpUrl
+from pythonjsonlogger.json import JsonFormatter
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
@@ -38,26 +39,46 @@ from mcp.server.auth.routes import cors_middleware, create_auth_routes
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rejeki_auth")
 
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 
-USERS_FILE = os.environ.get("USERS_CONFIG")
-if not USERS_FILE:
-    raise RuntimeError("USERS_CONFIG env var must be set to the path of users.json")
+USERS_DB = os.environ.get("USERS_DB")
+if not USERS_DB:
+    raise RuntimeError("USERS_DB env var must be set to the path of users.db")
 AS_BASE_URL = os.environ.get("AS_BASE_URL", "https://maulairfani.my.id/rejeki/auth")
 MCP_SCOPE = "rejeki"
 
+CREATE_USERS_TABLE = """
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    db_path TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"""
 
-def load_users() -> dict[str, dict]:
-    with open(USERS_FILE) as f:
-        return json.load(f)
+
+def _get_users_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(USERS_DB)
+    conn.row_factory = sqlite3.Row
+    conn.execute(CREATE_USERS_TABLE)
+    return conn
+
+
+def _get_user(username: str) -> dict | None:
+    with _get_users_conn() as conn:
+        row = conn.execute(
+            "SELECT username, password_hash, db_path FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 # ─── OAUTH PROVIDER ──────────────────────────────────────────────────────────
 
 class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, RefreshToken, AccessToken]):
-    """OAuth provider backed by users.json credentials."""
+    """OAuth provider backed by users.db credentials."""
 
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
@@ -68,11 +89,15 @@ class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
         self.state_mapping: dict[str, dict[str, Any]] = {}
 
     def _check_credentials(self, username: str, password: str) -> bool:
-        users = load_users()
-        user = users.get(username)
+        user = _get_user(username)
         if not user:
+            logger.warning("login_failed", extra={"username": username, "reason": "unknown_user"})
             return False
-        return user.get("password") == password
+        if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+            logger.warning("login_failed", extra={"username": username, "reason": "bad_password"})
+            return False
+        logger.info("login_success", extra={"username": username})
+        return True
 
     # ── OAuthAuthorizationServerProvider interface ──
 
@@ -121,6 +146,8 @@ class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
         self.token_user[token_str] = username
         del self.auth_codes[authorization_code.code]
 
+        logger.info("token_issued", extra={"username": username, "client_id": client.client_id})
+
         return OAuthToken(
             access_token=token_str,
             token_type="Bearer",
@@ -145,17 +172,18 @@ class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
         raise NotImplementedError
 
     async def revoke_token(self, token: str, token_type_hint: str | None = None) -> None:
+        username = self.token_user.pop(token, "unknown")
         self.tokens.pop(token, None)
-        self.token_user.pop(token, None)
+        logger.info("token_revoked", extra={"username": username})
 
     # ── Login flow ──
 
     def login_page_html(self, state: str, error: bool = False) -> str:
-        error_html = '<p class="error">Username atau password salah.</p>' if error else ""
+        error_html = '<p class="error">Invalid username or password.</p>' if error else ""
         return f"""<!DOCTYPE html>
 <html>
 <head>
-  <title>Rejeki MCP — Sign In</title>
+  <title>Finance MCP — Sign In</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {{ font-family: system-ui, sans-serif; max-width: 400px; margin: 80px auto; padding: 0 20px; }}
@@ -175,7 +203,7 @@ class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
   </style>
 </head>
 <body>
-  <h2>Rejeki MCP</h2>
+  <h2>Finance MCP</h2>
   <p class="sub">Sign in to access your financial data.</p>
   <form method="post" action="{self.base_url}/login/callback">
     <input type="hidden" name="state" value="{state}">
@@ -246,11 +274,14 @@ def make_introspect_handler(provider: RejekiOAuthProvider):
 
         access_token = await provider.load_access_token(token)
         if not access_token:
+            logger.debug("introspect_inactive", extra={"token_prefix": str(token)[:12]})
             return JSONResponse({"active": False})
 
         username = provider.token_user.get(token, "unknown")
-        users = load_users()
-        db_path = users.get(username, {}).get("db", "")
+        user = _get_user(username)
+        db_path = user["db_path"] if user else ""
+
+        logger.debug("introspect_ok", extra={"username": username})
 
         return JSONResponse({
             "active": True,
@@ -312,9 +343,15 @@ app = create_app()
 
 def main():
     import uvicorn
+
     port = int(os.environ.get("AUTH_PORT", 9004))
-    logging.basicConfig(level=logging.INFO)
-    print(f"Rejeki Auth Server on port {port}")
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(JsonFormatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    logging.root.handlers = [handler]
+    logging.root.setLevel(logging.INFO)
+
+    logger.info("server_start", extra={"port": port})
     uvicorn.run("rejeki_auth.server:app", host="0.0.0.0", port=port, reload=False)
 
 

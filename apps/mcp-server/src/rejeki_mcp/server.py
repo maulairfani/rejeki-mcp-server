@@ -1,3 +1,4 @@
+import logging
 import os
 from urllib.parse import quote
 
@@ -23,6 +24,8 @@ from rejeki_mcp.tools.wishlist import mcp as _wishlist_mcp
 
 load_dotenv()
 
+logger = logging.getLogger("rejeki_mcp")
+
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 
 INTROSPECT_URL = os.environ.get("INTROSPECT_URL", "http://127.0.0.1:9004/introspect")
@@ -42,21 +45,27 @@ class RejekiTokenVerifier(TokenVerifier):
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                 )
             except Exception:
+                logger.warning("token_verify_error: introspection request failed")
                 return None
 
         if resp.status_code != 200:
+            logger.warning("token_verify_error: introspection returned %d", resp.status_code)
             return None
 
         data = resp.json()
         if not data.get("active"):
+            logger.info("token_verify: inactive token")
             return None
 
+        username = data.get("username", data.get("client_id", "unknown"))
         db = data.get("db", os.path.expanduser("~/rejeki.db"))
         _db_path.set(db)
 
+        logger.info("token_verify_ok: user=%s", username)
+
         return AccessToken(
             token=token,
-            client_id=data.get("username", data.get("client_id", "unknown")),
+            client_id=username,
             scopes=data.get("scope", "").split(),
         )
 

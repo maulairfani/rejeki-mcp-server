@@ -297,72 +297,82 @@ def get_envelopes(db: Database, period: str | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
+from fastmcp.server.context import Context
+from fastmcp.server.dependencies import CurrentContext
 from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("envelopes")
 
 
 @mcp.tool(name="get_groups")
-def _get_groups_mcp() -> list:
+async def _get_groups_mcp(ctx: Context = CurrentContext()) -> list:
     """List all envelope groups."""
+    await ctx.info("get_groups")
     with get_user_db() as db:
         return get_groups(db)
 
 
 @mcp.tool(name="add_group")
-def _add_group_mcp(name: str, sort_order: int = 0) -> dict:
+async def _add_group_mcp(name: str, sort_order: int = 0, ctx: Context = CurrentContext()) -> dict:
     """Add a new envelope group."""
+    await ctx.info(f"add_group: name={name}")
     with get_user_db() as db:
         return add_group(db, name, sort_order)
 
 
 @mcp.tool(name="get_envelopes")
-def _get_envelopes_mcp(period: str | None = None) -> dict:
+async def _get_envelopes_mcp(period: str | None = None, ctx: Context = CurrentContext()) -> dict:
     """
     List all envelopes.
     Income sources: reference for recording income.
     Expense envelopes per group: carryover, assigned, activity, available, target.
     period format YYYY-MM (defaults to current month).
     """
+    await ctx.info(f"get_envelopes: period={period}")
     with get_user_db() as db:
         return get_envelopes(db, period)
 
 
 @mcp.tool(name="add_envelope")
-def _add_envelope_mcp(name: str, type: str, icon: str | None = None, group_id: int | None = None) -> dict:
+async def _add_envelope_mcp(name: str, type: str, icon: str | None = None, group_id: int | None = None, ctx: Context = CurrentContext()) -> dict:
     """
     Add a new envelope. type: income | expense.
     group_id for expense (optional — without a group, goes into 'Uncategorized').
     """
+    await ctx.info(f"add_envelope: name={name}, type={type}")
     with get_user_db() as db:
         return add_envelope(db, name, type, icon, group_id)
 
 
 @mcp.tool(name="edit_envelope")
-def _edit_envelope_mcp(
+async def _edit_envelope_mcp(
     id: int,
     name: str | None = None,
     icon: str | None = None,
     group_id: int | None = None,
+    ctx: Context = CurrentContext(),
 ) -> dict:
     """Edit an envelope. Only provide fields you want to change."""
+    await ctx.info(f"edit_envelope: id={id}")
     with get_user_db() as db:
         return edit_envelope(db, id, name, icon, group_id)
 
 
 @mcp.tool(name="delete_envelope")
-def _delete_envelope_mcp(id: int) -> dict:
+async def _delete_envelope_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
     """Delete an envelope and all its budget data."""
+    await ctx.info(f"delete_envelope: id={id}")
     with get_user_db() as db:
         return delete_envelope(db, id)
 
 
 @mcp.tool(name="set_target")
-def _set_target_mcp(
+async def _set_target_mcp(
     envelope_id: int,
     target_type: str,
     target_amount: float | None = None,
     target_deadline: str | None = None,
+    ctx: Context = CurrentContext(),
 ) -> dict:
     """
     Set a funding target on an expense envelope.
@@ -372,33 +382,37 @@ def _set_target_mcp(
                  'needed_by_date'   — need X by a specific date.
     target_deadline format YYYY-MM-DD (for savings_balance and needed_by_date).
     """
+    await ctx.info(f"set_target: envelope={envelope_id}, type={target_type}, amount={target_amount}")
     with get_user_db() as db:
         return set_target(db, envelope_id, target_type, target_amount, target_deadline)
 
 
 @mcp.tool(name="assign_to_envelope")
-def _assign_to_envelope_mcp(envelope_id: int, amount: float, period: str | None = None) -> dict:
+async def _assign_to_envelope_mcp(envelope_id: int, amount: float, period: str | None = None, ctx: Context = CurrentContext()) -> dict:
     """
     Assign money from Ready to Assign to an envelope.
     This is the core operation: 'give every rupiah a job'.
     Calling this again for the same period overwrites the previous assigned amount.
     period format YYYY-MM (defaults to current month).
     """
+    await ctx.info(f"assign_to_envelope: envelope={envelope_id}, amount={amount}, period={period}")
     with get_user_db() as db:
         return assign_to_envelope(db, envelope_id, amount, period)
 
 
 @mcp.tool(name="move_money")
-def _move_money_mcp(
+async def _move_money_mcp(
     from_envelope_id: int,
     to_envelope_id: int,
     amount: float,
     period: str | None = None,
+    ctx: Context = CurrentContext(),
 ) -> dict:
     """
     Move money between envelopes within a period.
     Use when one envelope is overspent and needs to be covered by another.
     period format YYYY-MM (defaults to current month).
     """
+    await ctx.info(f"move_money: from={from_envelope_id} to={to_envelope_id} amount={amount}")
     with get_user_db() as db:
         return move_money(db, from_envelope_id, to_envelope_id, amount, period)

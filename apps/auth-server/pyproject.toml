@@ -2,7 +2,7 @@
 name = "rejeki_auth"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["fastmcp", "uvicorn[standard]", "starlette", "pydantic", "python-dotenv"]
+dependencies = ["fastmcp", "uvicorn[standard]", "starlette", "pydantic", "python-dotenv", "bcrypt", "python-json-logger"]
 
 [project.scripts]
 rejeki-auth = "rejeki_auth.server:main"

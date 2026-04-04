@@ -58,41 +58,48 @@ def delete_wishlist_item(db: Database, id: int) -> dict:
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
+from fastmcp.server.context import Context
+from fastmcp.server.dependencies import CurrentContext
 from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("wishlist")
 
 
 @mcp.tool(name="add_wishlist_item")
-def _add_wishlist_item_mcp(name: str, price: float | None = None, priority: str = "medium", url: str | None = None, notes: str | None = None) -> dict:
+async def _add_wishlist_item_mcp(name: str, price: float | None = None, priority: str = "medium", url: str | None = None, notes: str | None = None, ctx: Context = CurrentContext()) -> dict:
     """Add item to wishlist. priority: high | medium | low"""
+    await ctx.info(f"add_wishlist_item: name={name}, price={price}")
     with get_user_db() as db:
         return add_wishlist_item(db, name, price, priority, url, notes)
 
 
 @mcp.tool(name="get_wishlist")
-def _get_wishlist_mcp(status: str | None = None) -> dict:
+async def _get_wishlist_mcp(status: str | None = None, ctx: Context = CurrentContext()) -> dict:
     """List wishlist items. Optional status filter: wanted | bought"""
+    await ctx.info(f"get_wishlist: status={status}")
     with get_user_db() as db:
         return get_wishlist(db, status)
 
 
 @mcp.tool(name="edit_wishlist_item")
-def _edit_wishlist_item_mcp(id: int, name: str | None = None, price: float | None = None, priority: str | None = None, url: str | None = None, notes: str | None = None) -> dict:
+async def _edit_wishlist_item_mcp(id: int, name: str | None = None, price: float | None = None, priority: str | None = None, url: str | None = None, notes: str | None = None, ctx: Context = CurrentContext()) -> dict:
     """Edit a wishlist item."""
+    await ctx.info(f"edit_wishlist_item: id={id}")
     with get_user_db() as db:
         return edit_wishlist_item(db, id, name, price, priority, url, notes)
 
 
 @mcp.tool(name="mark_bought")
-def _mark_bought_mcp(id: int) -> dict:
+async def _mark_bought_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
     """Mark a wishlist item as bought."""
+    await ctx.info(f"mark_bought: id={id}")
     with get_user_db() as db:
         return mark_bought(db, id)
 
 
 @mcp.tool(name="delete_wishlist_item")
-def _delete_wishlist_item_mcp(id: int) -> dict:
+async def _delete_wishlist_item_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
     """Delete a wishlist item."""
+    await ctx.info(f"delete_wishlist_item: id={id}")
     with get_user_db() as db:
         return delete_wishlist_item(db, id)

@@ -123,13 +123,15 @@ def delete_scheduled_transaction(db: Database, id: int) -> dict:
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
+from fastmcp.server.context import Context
+from fastmcp.server.dependencies import CurrentContext
 from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("scheduled")
 
 
 @mcp.tool(name="add_scheduled_transaction")
-def _add_scheduled_mcp(
+async def _add_scheduled_mcp(
     amount: float,
     type: str,
     account_id: int,
@@ -139,45 +141,51 @@ def _add_scheduled_mcp(
     payee: str | None = None,
     memo: str | None = None,
     recurrence: str = "once",
+    ctx: Context = CurrentContext(),
 ) -> dict:
     """
     Schedule a future transaction.
     recurrence: once | weekly | monthly | yearly.
     scheduled_date format YYYY-MM-DD.
     """
+    await ctx.info(f"add_scheduled_transaction: {type} {amount} date={scheduled_date} recurrence={recurrence}")
     with get_user_db() as db:
         return add_scheduled_transaction(db, amount, type, account_id, scheduled_date, envelope_id, to_account_id, payee, memo, recurrence)
 
 
 @mcp.tool(name="get_scheduled_transactions")
-def _get_scheduled_mcp(include_inactive: bool = False) -> list:
+async def _get_scheduled_mcp(include_inactive: bool = False, ctx: Context = CurrentContext()) -> list:
     """List scheduled transactions, including days_until field (days remaining)."""
+    await ctx.info("get_scheduled_transactions")
     with get_user_db() as db:
         return get_scheduled_transactions(db, include_inactive)
 
 
 @mcp.tool(name="approve_scheduled_transaction")
-def _approve_scheduled_mcp(id: int) -> dict:
+async def _approve_scheduled_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
     """
     Execute a scheduled transaction as a real transaction.
     If recurring, automatically schedules the next occurrence.
     """
+    await ctx.info(f"approve_scheduled_transaction: id={id}")
     with get_user_db() as db:
         return approve_scheduled_transaction(db, id)
 
 
 @mcp.tool(name="skip_scheduled_transaction")
-def _skip_scheduled_mcp(id: int) -> dict:
+async def _skip_scheduled_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
     """
     Skip this occurrence without recording a transaction.
     If recurring, advances to the next occurrence.
     """
+    await ctx.info(f"skip_scheduled_transaction: id={id}")
     with get_user_db() as db:
         return skip_scheduled_transaction(db, id)
 
 
 @mcp.tool(name="delete_scheduled_transaction")
-def _delete_scheduled_mcp(id: int) -> dict:
+async def _delete_scheduled_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
     """Delete a scheduled transaction entirely."""
+    await ctx.info(f"delete_scheduled_transaction: id={id}")
     with get_user_db() as db:
         return delete_scheduled_transaction(db, id)

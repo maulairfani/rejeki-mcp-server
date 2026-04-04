@@ -181,13 +181,15 @@ def get_transactions(
 # ---------------------------------------------------------------------------
 
 from fastmcp import FastMCP
+from fastmcp.server.context import Context
+from fastmcp.server.dependencies import CurrentContext
 from rejeki_mcp.deps import get_user_db
 
 mcp = FastMCP("transactions")
 
 
 @mcp.tool(name="add_transaction")
-def _add_transaction_mcp(
+async def _add_transaction_mcp(
     amount: float,
     type: str,
     account_id: int,
@@ -196,18 +198,20 @@ def _add_transaction_mcp(
     payee: str | None = None,
     memo: str | None = None,
     transaction_date: str | None = None,
+    ctx: Context = CurrentContext(),
 ) -> dict:
     """
     Record a new transaction.
     type: income | expense | transfer.
     transaction_date format YYYY-MM-DD (defaults to today).
     """
+    await ctx.info(f"add_transaction: {type} {amount} payee={payee}")
     with get_user_db() as db:
         return add_transaction(db, amount, type, account_id, envelope_id, to_account_id, payee, memo, transaction_date)
 
 
 @mcp.tool(name="get_transactions")
-def _get_transactions_mcp(
+async def _get_transactions_mcp(
     account_id: int | None = None,
     envelope_id: int | None = None,
     type: str | None = None,
@@ -215,17 +219,19 @@ def _get_transactions_mcp(
     date_from: str | None = None,
     date_to: str | None = None,
     limit: int = 50,
+    ctx: Context = CurrentContext(),
 ) -> list:
     """
     Query transactions. All filters are optional and combinable.
     payee: partial match (e.g. 'Grab' matches 'GrabFood').
     """
+    await ctx.info(f"get_transactions: filters account={account_id} envelope={envelope_id} type={type} payee={payee}")
     with get_user_db() as db:
         return get_transactions(db, account_id, envelope_id, type, payee, date_from, date_to, limit)
 
 
 @mcp.tool(name="edit_transaction")
-def _edit_transaction_mcp(
+async def _edit_transaction_mcp(
     id: int,
     amount: float | None = None,
     type: str | None = None,
@@ -235,14 +241,17 @@ def _edit_transaction_mcp(
     payee: str | None = None,
     memo: str | None = None,
     transaction_date: str | None = None,
+    ctx: Context = CurrentContext(),
 ) -> dict:
     """Edit an existing transaction. Only provide fields you want to change."""
+    await ctx.info(f"edit_transaction: id={id}")
     with get_user_db() as db:
         return edit_transaction(db, id, amount, type, account_id, envelope_id, to_account_id, payee, memo, transaction_date)
 
 
 @mcp.tool(name="delete_transaction")
-def _delete_transaction_mcp(id: int) -> dict:
+async def _delete_transaction_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
     """Delete a transaction and reverse its effect on account balance."""
+    await ctx.info(f"delete_transaction: id={id}")
     with get_user_db() as db:
         return delete_transaction(db, id)

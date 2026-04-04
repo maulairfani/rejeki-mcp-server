@@ -1,20 +1,22 @@
-import json
 import os
 import sqlite3
 
 
 def get_conn(username: str) -> sqlite3.Connection:
-    users_file = os.environ.get("USERS_CONFIG")
-    if not users_file:
-        raise RuntimeError("USERS_CONFIG env var not set")
-    with open(users_file) as f:
-        users = json.load(f)
-    user = users.get(username)
-    if not user:
-        raise ValueError(f"Unknown user: {username}")
-    conn = sqlite3.connect(user["db"])
+    users_db = os.environ.get("USERS_DB")
+    if not users_db:
+        raise RuntimeError("USERS_DB env var not set")
+    conn = sqlite3.connect(users_db)
     conn.row_factory = sqlite3.Row
-    return conn
+    row = conn.execute(
+        "SELECT db_path FROM users WHERE username = ?", (username,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise ValueError(f"Unknown user: {username}")
+    user_conn = sqlite3.connect(row["db_path"])
+    user_conn.row_factory = sqlite3.Row
+    return user_conn
 
 
 def get_accounts(username: str) -> dict:
@@ -33,7 +35,7 @@ def get_envelope_status(username: str, period: str) -> list[dict]:
             e.id,
             e.name,
             e.icon,
-            COALESCE(eg.name, 'Lainnya') AS group_name,
+            COALESCE(eg.name, 'Uncategorized') AS group_name,
             COALESCE(bp.assigned, 0) AS assigned,
             COALESCE(bp.carryover, 0) AS carryover,
             COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS activity
