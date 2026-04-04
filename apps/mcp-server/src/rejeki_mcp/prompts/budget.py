@@ -7,29 +7,30 @@ mcp = FastMCP()
 
 @mcp.prompt()
 def budget_review(period: str | None = None) -> str:
-    """Review budget bulanan: analisis overspend dan saran rebalancing."""
+    """Monthly budget review: analyze overspending and suggest rebalancing."""
     p = period or datetime.now().strftime("%Y-%m")
     return (
-        f"Lakukan review budget bulan {p}:\n\n"
-        f"1. Panggil finance_get_summary(period='{p}') untuk ringkasan income, expense, dan net.\n"
-        f"2. Panggil finance_get_envelopes(period='{p}') untuk detail setiap envelope "
+        f"Perform a budget review for {p}:\n\n"
+        f"1. Call finance_get_summary(period='{p}') for an income, expense, and net summary.\n"
+        f"2. Call finance_get_envelopes(period='{p}') for details on each envelope "
         f"(carryover, assigned, activity, available).\n"
-        f"3. Identifikasi envelope yang overspend (available negatif).\n"
-        f"4. Berikan ringkasan: envelope mana yang konsisten, mana yang perlu perhatian.\n"
-        f"5. Cek finance_get_ready_to_assign(period='{p}') — jika ada RTA tersisa, sarankan alokasi ke envelope yang kekurangan."
+        f"3. Identify envelopes that are overspent (negative available).\n"
+        f"4. Provide a summary: which envelopes are on track, which need attention.\n"
+        f"5. Check finance_get_ready_to_assign(period='{p}') — if there is remaining RTA, "
+        f"suggest allocating it to envelopes that are underfunded."
     )
 
 
 @mcp.prompt()
 def monthly_planning(period: str | None = None) -> str:
-    """Panduan distribusi budget awal bulan: cek RTA, lihat targets, assign hingga RTA = 0."""
+    """Monthly budget planning guide: check RTA, review targets, assign until RTA = 0."""
     p = period or datetime.now().strftime("%Y-%m")
     return (
-        f"Bantu planning budget bulan {p}:\n\n"
-        f"1. Panggil finance_get_ready_to_assign(period='{p}') — lihat berapa uang yang belum dialokasikan.\n"
-        f"2. Panggil finance_get_envelopes(period='{p}') — lihat target setiap envelope dan available saat ini.\n"
-        f"3. Prioritaskan envelope dengan target 'monthly' yang belum terpenuhi.\n"
-        f"4. Untuk envelope 'goal', cek apakah on track menuju deadline.\n"
-        f"5. Distribusikan RTA ke envelope yang paling butuh hingga RTA = 0.\n"
-        f"Gunakan finance_assign_to_envelope untuk setiap alokasi. Tanya user jika ada prioritas khusus."
+        f"Help plan the budget for {p}:\n\n"
+        f"1. Call finance_get_ready_to_assign(period='{p}') — see how much money is unallocated.\n"
+        f"2. Call finance_get_envelopes(period='{p}') — review each envelope's target and current available.\n"
+        f"3. Prioritize envelopes with 'monthly_spending' or 'monthly_savings' targets that are not yet met.\n"
+        f"4. For 'savings_balance' and 'needed_by_date' envelopes, check if they are on track toward their deadline.\n"
+        f"5. Distribute RTA to the envelopes that need it most until RTA = 0.\n"
+        f"Use finance_assign_to_envelope for each allocation. Ask the user if they have specific priorities."
     )

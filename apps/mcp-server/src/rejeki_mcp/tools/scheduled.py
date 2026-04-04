@@ -72,7 +72,7 @@ def get_scheduled_transactions(db: Database, include_inactive: bool = False) -> 
 def approve_scheduled_transaction(db: Database, id: int) -> dict:
     sched = db.fetchone("SELECT * FROM scheduled_transactions WHERE id = ? AND is_active = 1", (id,))
     if not sched:
-        raise ValueError(f"Scheduled transaction id={id} tidak ditemukan atau sudah tidak aktif")
+        raise ValueError(f"Scheduled transaction id={id} not found or already inactive")
 
     txn = add_transaction(
         db,
@@ -99,7 +99,7 @@ def approve_scheduled_transaction(db: Database, id: int) -> dict:
 def skip_scheduled_transaction(db: Database, id: int) -> dict:
     sched = db.fetchone("SELECT * FROM scheduled_transactions WHERE id = ? AND is_active = 1", (id,))
     if not sched:
-        raise ValueError(f"Scheduled transaction id={id} tidak ditemukan atau sudah tidak aktif")
+        raise ValueError(f"Scheduled transaction id={id} not found or already inactive")
 
     if sched["recurrence"] == "once":
         db.execute("UPDATE scheduled_transactions SET is_active = 0 WHERE id = ?", (id,))
@@ -113,7 +113,7 @@ def skip_scheduled_transaction(db: Database, id: int) -> dict:
 def delete_scheduled_transaction(db: Database, id: int) -> dict:
     sched = db.fetchone("SELECT * FROM scheduled_transactions WHERE id = ?", (id,))
     if not sched:
-        raise ValueError(f"Scheduled transaction id={id} tidak ditemukan")
+        raise ValueError(f"Scheduled transaction id={id} not found")
     db.execute("DELETE FROM scheduled_transactions WHERE id = ?", (id,))
     return {"deleted_id": id, "payee": sched["payee"]}
 
@@ -141,7 +141,7 @@ def _add_scheduled_mcp(
     recurrence: str = "once",
 ) -> dict:
     """
-    Jadwalkan transaksi di masa depan.
+    Schedule a future transaction.
     recurrence: once | weekly | monthly | yearly.
     scheduled_date format YYYY-MM-DD.
     """
@@ -151,7 +151,7 @@ def _add_scheduled_mcp(
 
 @mcp.tool(name="get_scheduled_transactions")
 def _get_scheduled_mcp(include_inactive: bool = False) -> list:
-    """List transaksi terjadwal, termasuk field days_until (berapa hari lagi)."""
+    """List scheduled transactions, including days_until field (days remaining)."""
     with get_user_db() as db:
         return get_scheduled_transactions(db, include_inactive)
 
@@ -159,8 +159,8 @@ def _get_scheduled_mcp(include_inactive: bool = False) -> list:
 @mcp.tool(name="approve_scheduled_transaction")
 def _approve_scheduled_mcp(id: int) -> dict:
     """
-    Eksekusi scheduled transaction sebagai transaksi nyata.
-    Jika recurring, otomatis jadwalkan ke occurrence berikutnya.
+    Execute a scheduled transaction as a real transaction.
+    If recurring, automatically schedules the next occurrence.
     """
     with get_user_db() as db:
         return approve_scheduled_transaction(db, id)
@@ -169,8 +169,8 @@ def _approve_scheduled_mcp(id: int) -> dict:
 @mcp.tool(name="skip_scheduled_transaction")
 def _skip_scheduled_mcp(id: int) -> dict:
     """
-    Lewati occurrence ini tanpa mencatat transaksi.
-    Jika recurring, maju ke occurrence berikutnya.
+    Skip this occurrence without recording a transaction.
+    If recurring, advances to the next occurrence.
     """
     with get_user_db() as db:
         return skip_scheduled_transaction(db, id)
@@ -178,6 +178,6 @@ def _skip_scheduled_mcp(id: int) -> dict:
 
 @mcp.tool(name="delete_scheduled_transaction")
 def _delete_scheduled_mcp(id: int) -> dict:
-    """Hapus scheduled transaction sepenuhnya."""
+    """Delete a scheduled transaction entirely."""
     with get_user_db() as db:
         return delete_scheduled_transaction(db, id)

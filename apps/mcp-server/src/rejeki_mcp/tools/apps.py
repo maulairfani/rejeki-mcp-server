@@ -26,9 +26,9 @@ def _budget_allocator_ui() -> str:
 )
 def _budget_allocator_mcp(period: str | None = None) -> dict:
     """
-    Buka Budget Allocator — UI interaktif untuk melihat dan assign budget ke semua envelope.
-    Tampilkan Ready to Assign dan semua envelope. User bisa langsung assign dari UI.
-    period format YYYY-MM (default bulan ini).
+    Open Budget Allocator — interactive UI to view and assign budget to all envelopes.
+    Shows Ready to Assign and all envelopes. Users can assign directly from the UI.
+    period format YYYY-MM (defaults to current month).
     """
     p = period or date.today().strftime("%Y-%m")
     with get_user_db() as db:

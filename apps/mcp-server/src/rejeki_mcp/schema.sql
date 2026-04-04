@@ -1,4 +1,4 @@
--- Rejeki Database Schema — Envelope Budget Edition
+-- Finance MCP Database Schema — Envelope Budget Edition
 --
 -- Table mapping:
 --   envelopes       = envelope definitions (name, icon, type, target)
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS envelopes (
     icon            TEXT,
     type            TEXT NOT NULL CHECK (type IN ('income', 'expense')),
     group_id        INTEGER REFERENCES envelope_groups(id),
-    target_type     TEXT CHECK (target_type IN ('monthly', 'goal')),
+    target_type     TEXT CHECK (target_type IN ('monthly_spending', 'monthly_savings', 'savings_balance', 'needed_by_date')),
     target_amount   REAL,
     target_deadline TEXT
 );
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     to_account_id INTEGER REFERENCES accounts(id),
     payee         TEXT,
     memo          TEXT,
-    date          TEXT NOT NULL DEFAULT (date('now'))
+    date          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Per-period budget data per envelope.
@@ -85,34 +85,34 @@ CREATE TABLE IF NOT EXISTS wishlist (
 
 -- Default envelope groups
 INSERT OR IGNORE INTO envelope_groups (id, name, sort_order) VALUES
-    (1, 'Kebutuhan Tetap',       1),
-    (2, 'Kebutuhan Sehari-hari', 2),
-    (3, 'Pengeluaran Pribadi',   3),
-    (4, 'Tabungan & Goals',      4),
-    (5, 'Tidak Terduga',         5);
+    (1, 'Fixed Expenses',    1),
+    (2, 'Daily Essentials',  2),
+    (3, 'Personal Spending', 3),
+    (4, 'Savings & Goals',   4),
+    (5, 'Unexpected',        5);
 
 -- Default envelopes
 INSERT OR IGNORE INTO envelopes (id, name, icon, type, group_id) VALUES
     -- Income sources (no group)
-    (1,  'Gaji',          '💼', 'income',  NULL),
-    (2,  'Freelance',     '💻', 'income',  NULL),
-    (3,  'Investasi',     '📈', 'income',  NULL),
-    (4,  'Lainnya',       '💰', 'income',  NULL),
-    -- Kebutuhan Tetap
-    (5,  'Kos/Sewa',     '🏡', 'expense', 1),
-    (6,  'Tagihan',      '📄', 'expense', 1),
-    (7,  'Langganan',    '🔄', 'expense', 1),
-    (8,  'Kirim Ortu',   '🏠', 'expense', 1),
-    -- Kebutuhan Sehari-hari
-    (9,  'Makan',        '🍽️', 'expense', 2),
-    (10, 'Transport',    '🚗', 'expense', 2),
-    -- Pengeluaran Pribadi
-    (11, 'Belanja',      '🛍️', 'expense', 3),
-    (12, 'Hiburan',      '🎮', 'expense', 3),
-    (13, 'Kesehatan',    '🏥', 'expense', 3),
-    (14, 'Pendidikan',   '📚', 'expense', 3),
-    -- Tabungan & Goals
-    (15, 'Dana Darurat', '🛡️', 'expense', 4),
-    (16, 'Tabungan',     '💎', 'expense', 4),
-    -- Tidak Terduga
-    (17, 'Lainnya',      '💸', 'expense', 5);
+    (1,  'Salary',           '💼', 'income',  NULL),
+    (2,  'Freelance',        '💻', 'income',  NULL),
+    (3,  'Investments',      '📈', 'income',  NULL),
+    (4,  'Other Income',     '💰', 'income',  NULL),
+    -- Fixed Expenses
+    (5,  'Rent',             '🏡', 'expense', 1),
+    (6,  'Bills',            '📄', 'expense', 1),
+    (7,  'Subscriptions',    '🔄', 'expense', 1),
+    (8,  'Family Support',   '🏠', 'expense', 1),
+    -- Daily Essentials
+    (9,  'Food',             '🍽️', 'expense', 2),
+    (10, 'Transport',        '🚗', 'expense', 2),
+    -- Personal Spending
+    (11, 'Shopping',         '🛍️', 'expense', 3),
+    (12, 'Entertainment',    '🎮', 'expense', 3),
+    (13, 'Health',           '🏥', 'expense', 3),
+    (14, 'Education',        '📚', 'expense', 3),
+    -- Savings & Goals
+    (15, 'Emergency Fund',   '🛡️', 'expense', 4),
+    (16, 'Savings',          '💎', 'expense', 4),
+    -- Unexpected
+    (17, 'Miscellaneous',    '💸', 'expense', 5);

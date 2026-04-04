@@ -176,7 +176,7 @@ class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
 </head>
 <body>
   <h2>Rejeki MCP</h2>
-  <p class="sub">Masuk untuk mengakses data keuanganmu.</p>
+  <p class="sub">Sign in to access your financial data.</p>
   <form method="post" action="{self.base_url}/login/callback">
     <input type="hidden" name="state" value="{state}">
     <label>Username</label>
@@ -184,7 +184,7 @@ class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
     <label>Password</label>
     <input type="password" name="password" required>
     {error_html}
-    <button type="submit">Masuk</button>
+    <button type="submit">Sign In</button>
   </form>
 </body>
 </html>"""

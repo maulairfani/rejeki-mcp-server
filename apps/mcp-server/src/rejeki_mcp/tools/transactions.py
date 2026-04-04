@@ -78,7 +78,7 @@ def edit_transaction(
 ) -> dict:
     old = db.fetchone("SELECT * FROM transactions WHERE id = ?", (id,))
     if not old:
-        raise ValueError(f"Transaksi id={id} tidak ditemukan")
+        raise ValueError(f"Transaction id={id} not found")
 
     _reverse_balance(db, old)
 
@@ -115,7 +115,7 @@ def edit_transaction(
 def delete_transaction(db: Database, id: int) -> dict:
     txn = db.fetchone("SELECT * FROM transactions WHERE id = ?", (id,))
     if not txn:
-        raise ValueError(f"Transaksi id={id} tidak ditemukan")
+        raise ValueError(f"Transaction id={id} not found")
 
     _reverse_balance(db, txn)
     db.execute("DELETE FROM transactions WHERE id = ?", (id,))
@@ -198,9 +198,9 @@ def _add_transaction_mcp(
     transaction_date: str | None = None,
 ) -> dict:
     """
-    Catat transaksi baru.
+    Record a new transaction.
     type: income | expense | transfer.
-    transaction_date format YYYY-MM-DD (default hari ini).
+    transaction_date format YYYY-MM-DD (defaults to today).
     """
     with get_user_db() as db:
         return add_transaction(db, amount, type, account_id, envelope_id, to_account_id, payee, memo, transaction_date)
@@ -217,8 +217,8 @@ def _get_transactions_mcp(
     limit: int = 50,
 ) -> list:
     """
-    Query transaksi. Semua filter opsional dan bisa dikombinasikan.
-    payee: partial match (misal 'Grab' cocok dengan 'GrabFood').
+    Query transactions. All filters are optional and combinable.
+    payee: partial match (e.g. 'Grab' matches 'GrabFood').
     """
     with get_user_db() as db:
         return get_transactions(db, account_id, envelope_id, type, payee, date_from, date_to, limit)
@@ -236,13 +236,13 @@ def _edit_transaction_mcp(
     memo: str | None = None,
     transaction_date: str | None = None,
 ) -> dict:
-    """Edit transaksi yang sudah ada. Isi hanya field yang mau diubah."""
+    """Edit an existing transaction. Only provide fields you want to change."""
     with get_user_db() as db:
         return edit_transaction(db, id, amount, type, account_id, envelope_id, to_account_id, payee, memo, transaction_date)
 
 
 @mcp.tool(name="delete_transaction")
 def _delete_transaction_mcp(id: int) -> dict:
-    """Hapus transaksi dan balikkan efeknya ke saldo rekening."""
+    """Delete a transaction and reverse its effect on account balance."""
     with get_user_db() as db:
         return delete_transaction(db, id)

@@ -59,7 +59,7 @@ def add_group(db: Database, name: str, sort_order: int = 0) -> dict:
 
 def add_envelope(db: Database, name: str, type: str, icon: str | None = None, group_id: int | None = None) -> dict:
     if type not in ("income", "expense"):
-        raise ValueError("type harus 'income' atau 'expense'")
+        raise ValueError("type must be 'income' or 'expense'")
     id = db.execute(
         "INSERT INTO envelopes (name, icon, type, group_id) VALUES (?, ?, ?, ?)",
         (name, icon, type, group_id),
@@ -70,7 +70,7 @@ def add_envelope(db: Database, name: str, type: str, icon: str | None = None, gr
 def edit_envelope(db: Database, id: int, name: str | None = None, icon: str | None = None, group_id: int | None = None) -> dict:
     env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (id,))
     if not env:
-        raise ValueError(f"Envelope id={id} tidak ditemukan")
+        raise ValueError(f"Envelope id={id} not found")
 
     new_name = name or env["name"]
     new_icon = icon if icon is not None else env["icon"]
@@ -86,7 +86,7 @@ def edit_envelope(db: Database, id: int, name: str | None = None, icon: str | No
 def delete_envelope(db: Database, id: int) -> dict:
     env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (id,))
     if not env:
-        raise ValueError(f"Envelope id={id} tidak ditemukan")
+        raise ValueError(f"Envelope id={id} not found")
 
     db.execute("DELETE FROM budget_periods WHERE envelope_id = ?", (id,))
     db.execute("DELETE FROM envelopes WHERE id = ?", (id,))
@@ -102,9 +102,9 @@ def set_target(
 ) -> dict:
     env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (envelope_id,))
     if not env:
-        raise ValueError(f"Envelope id={envelope_id} tidak ditemukan")
+        raise ValueError(f"Envelope id={envelope_id} not found")
     if env["type"] != "expense":
-        raise ValueError("Hanya envelope expense yang bisa punya target")
+        raise ValueError("Only expense envelopes can have targets")
 
     db.execute(
         "UPDATE envelopes SET target_type = ?, target_amount = ?, target_deadline = ? WHERE id = ?",
@@ -128,9 +128,9 @@ def assign_to_envelope(db: Database, envelope_id: int, amount: float, period: st
 
     env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (envelope_id,))
     if not env:
-        raise ValueError(f"Envelope id={envelope_id} tidak ditemukan")
+        raise ValueError(f"Envelope id={envelope_id} not found")
     if env["type"] != "expense":
-        raise ValueError("Hanya envelope expense yang bisa di-assign")
+        raise ValueError("Only expense envelopes can be assigned")
 
     existing = db.fetchone(
         "SELECT id, carryover FROM budget_periods WHERE envelope_id = ? AND period = ?",
@@ -164,7 +164,7 @@ def move_money(db: Database, from_id: int, to_id: int, amount: float, period: st
     from_env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (from_id,))
     to_env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (to_id,))
     if not from_env or not to_env:
-        raise ValueError("Envelope tidak ditemukan")
+        raise ValueError("Envelope not found")
 
     from_bp = db.fetchone(
         "SELECT id, assigned, carryover FROM budget_periods WHERE envelope_id = ? AND period = ?",
@@ -250,13 +250,15 @@ def get_envelopes(db: Database, period: str | None = None) -> dict:
         act = _activity(db, env["id"], period)
         available = carryover + assigned - act
 
-        group_name = env["group_name"] or "Lainnya"
+        group_name = env["group_name"] or "Uncategorized"
         if group_name not in groups:
             groups[group_name] = {"group_id": env["group_id"], "envelopes": [], "group_available": 0.0}
 
         target = None
         if env["target_type"]:
-            if env["target_type"] == "monthly":
+            if env["target_type"] in ("monthly_spending",):
+                funded = act <= (env["target_amount"] or 0)
+            elif env["target_type"] in ("monthly_savings",):
                 funded = assigned >= (env["target_amount"] or 0)
             else:
                 funded = available >= (env["target_amount"] or 0)
@@ -302,14 +304,14 @@ mcp = FastMCP("envelopes")
 
 @mcp.tool(name="get_groups")
 def _get_groups_mcp() -> list:
-    """List semua kelompok envelope."""
+    """List all envelope groups."""
     with get_user_db() as db:
         return get_groups(db)
 
 
 @mcp.tool(name="add_group")
 def _add_group_mcp(name: str, sort_order: int = 0) -> dict:
-    """Tambah kelompok envelope baru."""
+    """Add a new envelope group."""
     with get_user_db() as db:
         return add_group(db, name, sort_order)
 
@@ -317,10 +319,10 @@ def _add_group_mcp(name: str, sort_order: int = 0) -> dict:
 @mcp.tool(name="get_envelopes")
 def _get_envelopes_mcp(period: str | None = None) -> dict:
     """
-    Tampilkan semua envelope.
-    Income sources: referensi untuk mencatat pemasukan.
-    Expense envelopes per kelompok: carryover, assigned, activity, available, target.
-    period format YYYY-MM (default bulan ini).
+    List all envelopes.
+    Income sources: reference for recording income.
+    Expense envelopes per group: carryover, assigned, activity, available, target.
+    period format YYYY-MM (defaults to current month).
     """
     with get_user_db() as db:
         return get_envelopes(db, period)
@@ -329,8 +331,8 @@ def _get_envelopes_mcp(period: str | None = None) -> dict:
 @mcp.tool(name="add_envelope")
 def _add_envelope_mcp(name: str, type: str, icon: str | None = None, group_id: int | None = None) -> dict:
     """
-    Tambah envelope baru. type: income | expense.
-    group_id untuk expense (opsional — tanpa group masuk kelompok 'Lainnya').
+    Add a new envelope. type: income | expense.
+    group_id for expense (optional — without a group, goes into 'Uncategorized').
     """
     with get_user_db() as db:
         return add_envelope(db, name, type, icon, group_id)
@@ -343,14 +345,14 @@ def _edit_envelope_mcp(
     icon: str | None = None,
     group_id: int | None = None,
 ) -> dict:
-    """Edit envelope. Isi hanya field yang mau diubah."""
+    """Edit an envelope. Only provide fields you want to change."""
     with get_user_db() as db:
         return edit_envelope(db, id, name, icon, group_id)
 
 
 @mcp.tool(name="delete_envelope")
 def _delete_envelope_mcp(id: int) -> dict:
-    """Hapus envelope beserta semua data budgetnya."""
+    """Delete an envelope and all its budget data."""
     with get_user_db() as db:
         return delete_envelope(db, id)
 
@@ -363,10 +365,12 @@ def _set_target_mcp(
     target_deadline: str | None = None,
 ) -> dict:
     """
-    Set funding target pada envelope expense.
-    target_type: 'monthly' — assign X setiap bulan.
-                 'goal'    — kumpulkan X sampai deadline.
-    target_deadline format YYYY-MM-DD, hanya untuk goal.
+    Set a funding target on an expense envelope.
+    target_type: 'monthly_spending' — spend up to X per month.
+                 'monthly_savings'  — assign X every month (accumulates).
+                 'savings_balance'  — save up to X total.
+                 'needed_by_date'   — need X by a specific date.
+    target_deadline format YYYY-MM-DD (for savings_balance and needed_by_date).
     """
     with get_user_db() as db:
         return set_target(db, envelope_id, target_type, target_amount, target_deadline)
@@ -375,10 +379,10 @@ def _set_target_mcp(
 @mcp.tool(name="assign_to_envelope")
 def _assign_to_envelope_mcp(envelope_id: int, amount: float, period: str | None = None) -> dict:
     """
-    Assign uang dari Ready to Assign ke envelope.
-    Ini operasi inti Rejeki: 'give every rupiah a job'.
-    Memanggil ini lagi pada period yang sama akan menimpa assigned sebelumnya.
-    period format YYYY-MM (default bulan ini).
+    Assign money from Ready to Assign to an envelope.
+    This is the core operation: 'give every rupiah a job'.
+    Calling this again for the same period overwrites the previous assigned amount.
+    period format YYYY-MM (defaults to current month).
     """
     with get_user_db() as db:
         return assign_to_envelope(db, envelope_id, amount, period)
@@ -392,9 +396,9 @@ def _move_money_mcp(
     period: str | None = None,
 ) -> dict:
     """
-    Pindahkan uang antar envelope dalam satu period.
-    Dipakai saat overspend di satu envelope dan perlu ditutup dari envelope lain.
-    period format YYYY-MM (default bulan ini).
+    Move money between envelopes within a period.
+    Use when one envelope is overspent and needs to be covered by another.
+    period format YYYY-MM (defaults to current month).
     """
     with get_user_db() as db:
         return move_money(db, from_envelope_id, to_envelope_id, amount, period)

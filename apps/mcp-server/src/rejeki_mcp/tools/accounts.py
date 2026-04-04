@@ -18,7 +18,7 @@ def get_accounts(db: Database) -> dict:
 def edit_account(db: Database, id: int, name: str | None = None, type: str | None = None) -> dict:
     account = db.fetchone("SELECT * FROM accounts WHERE id = ?", (id,))
     if not account:
-        raise ValueError(f"Rekening id={id} tidak ditemukan")
+        raise ValueError(f"Account id={id} not found")
 
     new_name = name or account["name"]
     new_type = type or account["type"]
@@ -29,7 +29,7 @@ def edit_account(db: Database, id: int, name: str | None = None, type: str | Non
 def update_balance(db: Database, id: int, balance: float) -> dict:
     account = db.fetchone("SELECT * FROM accounts WHERE id = ?", (id,))
     if not account:
-        raise ValueError(f"Rekening id={id} tidak ditemukan")
+        raise ValueError(f"Account id={id} not found")
 
     db.execute("UPDATE accounts SET balance = ? WHERE id = ?", (balance, id))
     return {"id": id, "name": account["name"], "type": account["type"], "balance": balance}
@@ -38,7 +38,7 @@ def update_balance(db: Database, id: int, balance: float) -> dict:
 def delete_account(db: Database, id: int) -> dict:
     account = db.fetchone("SELECT * FROM accounts WHERE id = ?", (id,))
     if not account:
-        raise ValueError(f"Rekening id={id} tidak ditemukan")
+        raise ValueError(f"Account id={id} not found")
 
     db.execute("DELETE FROM accounts WHERE id = ?", (id,))
     return {"deleted_id": id, "name": account["name"]}
@@ -56,34 +56,34 @@ mcp = FastMCP("accounts")
 
 @mcp.tool(name="add_account")
 def _add_account_mcp(name: str, type: str, initial_balance: float = 0) -> dict:
-    """Tambah rekening baru. type: bank | ewallet | cash"""
+    """Add a new account. type: bank | ewallet | cash"""
     with get_user_db() as db:
         return add_account(db, name, type, initial_balance)
 
 
 @mcp.tool(name="get_accounts")
 def _get_accounts_mcp() -> dict:
-    """List semua rekening beserta saldo dan total keseluruhan."""
+    """List all accounts with balances and total."""
     with get_user_db() as db:
         return get_accounts(db)
 
 
 @mcp.tool(name="edit_account")
 def _edit_account_mcp(id: int, name: str | None = None, type: str | None = None) -> dict:
-    """Edit nama atau tipe rekening."""
+    """Edit account name or type."""
     with get_user_db() as db:
         return edit_account(db, id, name, type)
 
 
 @mcp.tool(name="update_balance")
 def _update_balance_mcp(id: int, balance: float) -> dict:
-    """Set saldo rekening langsung (rekonsiliasi manual)."""
+    """Set account balance directly (manual reconciliation)."""
     with get_user_db() as db:
         return update_balance(db, id, balance)
 
 
 @mcp.tool(name="delete_account")
 def _delete_account_mcp(id: int) -> dict:
-    """Hapus rekening."""
+    """Delete an account."""
     with get_user_db() as db:
         return delete_account(db, id)

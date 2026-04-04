@@ -15,9 +15,9 @@ from rejeki_platform.db import get_accounts, get_envelope_status, get_monthly_su
 
 load_dotenv()
 
-_MONTHS_ID = [
-    "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+_MONTHS = [
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
 ]
 
 app = FastAPI(title="Rejeki Platform")
@@ -48,7 +48,7 @@ async def redirect_to_login(request: Request, exc: NotAuthenticated):
 async def dashboard(request: Request, username: str = Depends(require_user)):
     now = datetime.now()
     period = now.strftime("%Y-%m")
-    period_display = f"{_MONTHS_ID[now.month]} {now.year}"
+    period_display = f"{_MONTHS[now.month]} {now.year}"
 
     try:
         accounts_data = get_accounts(username)

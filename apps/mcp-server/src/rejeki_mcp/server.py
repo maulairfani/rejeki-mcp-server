@@ -99,11 +99,11 @@ mcp = FastMCP(
     icons=[_rejeki_icon],
     auth=_token_verifier,
     instructions=(
-        "Aplikasi personal envelope-budgeting. "
-        "Melacak rekening, kategori envelope, transaksi, dan aset. "
-        "Format tanggal: YYYY-MM-DD. Nominal dalam IDR. "
-        "Tools untuk aksi: tambah, edit, hapus, assign, approve. "
-        "Prompts tersedia untuk workflow: budget_review, monthly_planning, onboarding_guide."
+        "Personal envelope-budgeting application. "
+        "Tracks accounts, envelope categories, transactions, and assets. "
+        "Date format: YYYY-MM-DD. Amounts in IDR. "
+        "Tools for actions: add, edit, delete, assign, approve. "
+        "Available prompts for workflows: budget_review, monthly_planning, onboarding_guide."
     ),
 )
 

@@ -20,7 +20,7 @@ def get_wishlist(db: Database, status: str | None = None) -> dict:
 def edit_wishlist_item(db: Database, id: int, name: str | None = None, price: float | None = None, priority: str | None = None, url: str | None = None, notes: str | None = None) -> dict:
     item = db.fetchone("SELECT * FROM wishlist WHERE id = ?", (id,))
     if not item:
-        raise ValueError(f"Wishlist item id={id} tidak ditemukan")
+        raise ValueError(f"Wishlist item id={id} not found")
 
     new_name     = name     if name     is not None else item["name"]
     new_price    = price    if price    is not None else item["price"]
@@ -38,7 +38,7 @@ def edit_wishlist_item(db: Database, id: int, name: str | None = None, price: fl
 def mark_bought(db: Database, id: int) -> dict:
     item = db.fetchone("SELECT * FROM wishlist WHERE id = ?", (id,))
     if not item:
-        raise ValueError(f"Wishlist item id={id} tidak ditemukan")
+        raise ValueError(f"Wishlist item id={id} not found")
 
     db.execute("UPDATE wishlist SET status = 'bought' WHERE id = ?", (id,))
     return {"id": id, "name": item["name"], "status": "bought"}
@@ -47,7 +47,7 @@ def mark_bought(db: Database, id: int) -> dict:
 def delete_wishlist_item(db: Database, id: int) -> dict:
     item = db.fetchone("SELECT * FROM wishlist WHERE id = ?", (id,))
     if not item:
-        raise ValueError(f"Wishlist item id={id} tidak ditemukan")
+        raise ValueError(f"Wishlist item id={id} not found")
 
     db.execute("DELETE FROM wishlist WHERE id = ?", (id,))
     return {"deleted_id": id, "name": item["name"]}
@@ -65,34 +65,34 @@ mcp = FastMCP("wishlist")
 
 @mcp.tool(name="add_wishlist_item")
 def _add_wishlist_item_mcp(name: str, price: float | None = None, priority: str = "medium", url: str | None = None, notes: str | None = None) -> dict:
-    """Tambah item ke wishlist. priority: high | medium | low"""
+    """Add item to wishlist. priority: high | medium | low"""
     with get_user_db() as db:
         return add_wishlist_item(db, name, price, priority, url, notes)
 
 
 @mcp.tool(name="get_wishlist")
 def _get_wishlist_mcp(status: str | None = None) -> dict:
-    """List wishlist. status opsional: wanted | bought"""
+    """List wishlist items. Optional status filter: wanted | bought"""
     with get_user_db() as db:
         return get_wishlist(db, status)
 
 
 @mcp.tool(name="edit_wishlist_item")
 def _edit_wishlist_item_mcp(id: int, name: str | None = None, price: float | None = None, priority: str | None = None, url: str | None = None, notes: str | None = None) -> dict:
-    """Edit item wishlist."""
+    """Edit a wishlist item."""
     with get_user_db() as db:
         return edit_wishlist_item(db, id, name, price, priority, url, notes)
 
 
 @mcp.tool(name="mark_bought")
 def _mark_bought_mcp(id: int) -> dict:
-    """Tandai item wishlist sebagai sudah dibeli."""
+    """Mark a wishlist item as bought."""
     with get_user_db() as db:
         return mark_bought(db, id)
 
 
 @mcp.tool(name="delete_wishlist_item")
 def _delete_wishlist_item_mcp(id: int) -> dict:
-    """Hapus item dari wishlist."""
+    """Delete a wishlist item."""
     with get_user_db() as db:
         return delete_wishlist_item(db, id)

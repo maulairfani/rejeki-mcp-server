@@ -76,7 +76,7 @@ def get_age_of_money(db: Database) -> dict:
     )
 
     if not incomes or not expenses:
-        return {"age_of_money": None, "message": "Belum cukup data transaksi"}
+        return {"age_of_money": None, "message": "Not enough transaction data"}
 
     pool = [[row["date"], float(row["amount"])] for row in incomes]
     pool_ptr = 0
@@ -106,7 +106,7 @@ def get_age_of_money(db: Database) -> dict:
             expense_ages.append(weighted_age / float(exp["amount"]))
 
     if not expense_ages:
-        return {"age_of_money": None, "message": "Belum ada pengeluaran"}
+        return {"age_of_money": None, "message": "No expenses recorded"}
 
     recent = expense_ages[-10:]
     aom = round(sum(recent) / len(recent))
@@ -114,16 +114,16 @@ def get_age_of_money(db: Database) -> dict:
     if aom < 10:
         status = "paycheck_to_paycheck"
     elif aom < 30:
-        status = "mendekati_buffer"
+        status = "approaching_buffer"
     elif aom < 60:
-        status = "sehat"
+        status = "healthy"
     else:
-        status = "sangat_sehat"
+        status = "very_healthy"
 
     return {
         "age_of_money": aom,
-        "unit": "hari",
-        "based_on": f"{len(recent)} transaksi terakhir",
+        "unit": "days",
+        "based_on": f"last {len(recent)} transactions",
         "status": status,
         "milestone_30_days": aom >= 30,
     }
@@ -197,27 +197,27 @@ def get_onboarding_status(db: Database) -> dict:
     steps = [
         {
             "step": 1,
-            "title": "Tambah rekening",
+            "title": "Add accounts",
             "done": has_accounts,
-            "hint": "Tambahkan rekening kamu (BCA, GoPay, Cash, dll) beserta saldo saat ini.",
+            "hint": "Add your accounts (bank, e-wallet, cash) with their current balances.",
         },
         {
             "step": 2,
-            "title": "Set target per envelope",
+            "title": "Set envelope targets",
             "done": has_targets,
-            "hint": "Set target bulanan atau goal untuk tiap envelope pengeluaran.",
+            "hint": "Set monthly or goal targets for each expense envelope.",
         },
         {
             "step": 3,
-            "title": "Assign uang ke envelope",
+            "title": "Assign money to envelopes",
             "done": any_assigned,
-            "hint": "Assign uang dari Ready to Assign ke envelope-envelope sampai RTA = 0.",
+            "hint": "Assign money from Ready to Assign to your envelopes until RTA = 0.",
         },
         {
             "step": 4,
-            "title": "RTA = nol",
+            "title": "RTA = zero",
             "done": all_assigned,
-            "hint": "Setiap rupiah harus punya tugas. Pastikan Ready to Assign mencapai nol.",
+            "hint": "Every rupiah should have a job. Make sure Ready to Assign reaches zero.",
         },
     ]
 
@@ -247,8 +247,8 @@ mcp = FastMCP("analytics")
 @mcp.tool(name="get_onboarding_status")
 def _get_onboarding_status_mcp() -> dict:
     """
-    Cek status onboarding: rekening, targets, envelope assignment, RTA.
-    Panggil ini di awal setiap sesi baru.
+    Check onboarding status: accounts, targets, envelope assignments, RTA.
+    Call this at the start of each new session.
     """
     with get_user_db() as db:
         return get_onboarding_status(db)
@@ -257,9 +257,9 @@ def _get_onboarding_status_mcp() -> dict:
 @mcp.tool(name="get_ready_to_assign")
 def _get_ready_to_assign_mcp(period: str | None = None) -> dict:
     """
-    Hitung Ready to Assign = total saldo rekening − total available semua envelope.
-    Target: nol. Setiap rupiah harus punya tugas.
-    period format YYYY-MM (default bulan ini).
+    Calculate Ready to Assign = total account balance - total available across all envelopes.
+    Target: zero. Every rupiah should have a job.
+    period format YYYY-MM (defaults to current month).
     """
     with get_user_db() as db:
         return get_ready_to_assign(db, period)
@@ -268,8 +268,8 @@ def _get_ready_to_assign_mcp(period: str | None = None) -> dict:
 @mcp.tool(name="get_age_of_money")
 def _get_age_of_money_mcp() -> dict:
     """
-    Hitung Age of Money: rata-rata berapa hari uang duduk sebelum dipakai.
-    Dihitung FIFO. Target: 30+ hari.
+    Calculate Age of Money: average number of days money sits before being spent.
+    Calculated using FIFO. Target: 30+ days.
     """
     with get_user_db() as db:
         return get_age_of_money(db)
@@ -277,13 +277,13 @@ def _get_age_of_money_mcp() -> dict:
 
 @mcp.tool(name="get_summary")
 def _get_summary_mcp(period: str | None = None) -> dict:
-    """Ringkasan bulanan: income, expense, net, breakdown per envelope. period: YYYY-MM."""
+    """Monthly summary: income, expense, net, breakdown per envelope. period: YYYY-MM."""
     with get_user_db() as db:
         return get_summary(db, period)
 
 
 @mcp.tool(name="get_spending_trend")
 def _get_spending_trend_mcp(envelope_id: int | None = None, months: int = 3) -> list:
-    """Tren pengeluaran per envelope, N bulan ke belakang."""
+    """Spending trend per envelope, N months back."""
     with get_user_db() as db:
         return get_spending_trend(db, envelope_id, months)
