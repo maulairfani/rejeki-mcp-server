@@ -1,31 +1,31 @@
-# Rejeki MCP Server
+# Finance MCP Server
 
-AI-powered personal finance agent built with the MCP SDK and SQLite. Implements envelope budgeting — setiap rupiah punya tugasnya masing-masing.
+AI-powered personal finance agent built with the MCP SDK and SQLite. Implements envelope budgeting — every rupiah has a job.
 
-Didesain untuk dipakai di **claude.ai** sebagai MCP integration.
+Designed to be used with **any MCP client** (Claude, Cursor, etc.) as an MCP integration.
 
 ---
 
-## Arsitektur
+## Architecture
 
 ```
-claude.ai
+MCP Client (Claude, Cursor, etc.)
    │
    ▼ HTTPS
 Nginx (reverse proxy)
-   ├── /rejeki/mcp/   → Rejeki MCP Server  (port 8001)
-   └── /rejeki/auth/  → Rejeki Auth Server (port 9004)
+   ├── /rejeki/mcp/   → MCP Server  (port 8001)
+   └── /rejeki/auth/  → Auth Server (port 9004)
 ```
 
-Monorepo dengan tiga apps di folder `apps/`:
+Monorepo with three apps in the `apps/` folder:
 
-- **`apps/mcp-server/`** — FastMCP server; tools untuk transaksi, envelope, rekening
-- **`apps/auth-server/`** — OAuth 2.1 dengan login form berbasis `users.json`
-- **`apps/platform/`** — Dashboard visualisasi data keuangan (port 8002)
+- **`apps/mcp-server/`** — FastMCP server; tools for transactions, envelopes, accounts
+- **`apps/auth-server/`** — OAuth 2.1 with login form backed by `users.json`
+- **`apps/platform/`** — Financial data visualization dashboard (port 8002)
 
 ---
 
-## Setup Lokal (Development)
+## Local Setup (Development)
 
 ### 1. Clone & install dependencies
 
@@ -37,108 +37,108 @@ pip install -e apps/auth-server
 pip install -e apps/platform
 ```
 
-### 2. Buat file `.env`
+### 2. Create `.env` file
 
 ```bash
 cp .env.example .env
 ```
 
-Untuk development lokal, cukup set dua variabel ini di `.env`:
+For local development, just set these two variables in `.env`:
 
 ```env
-TEST_TOKEN=token-rahasia-bebas
+TEST_TOKEN=any-secret-token
 TEST_DB=./users/test.db
 ```
 
-### 3. Jalankan server
+### 3. Run servers
 
 ```bash
 # MCP server (port 8001)
 rejeki
 
-# Auth server (port 9004) — opsional untuk dev, cukup pakai TEST_TOKEN
+# Auth server (port 9004) — optional for dev, just use TEST_TOKEN
 rejeki-auth
 
 # Platform dashboard (port 8002)
 rejeki-platform
 ```
 
-MCP server test:
+MCP server health check:
 
 ```bash
 curl http://localhost:8001/health
 ```
 
-Platform dashboard: buka `http://localhost:8002` di browser, login dengan credentials dari `users.json`.
+Platform dashboard: open `http://localhost:8002` in your browser, log in with credentials from `users.json`.
 
-### 4. Konek ke claude.ai (lokal)
+### 4. Connect to MCP client (local)
 
-Gunakan MCP Inspector atau tambahkan ke claude desktop config dengan `TEST_TOKEN`.
+Use MCP Inspector or add to your MCP client config with `TEST_TOKEN`.
 
 ---
 
-## Setup VPS
+## VPS Setup
 
-### Prasyarat
+### Prerequisites
 
 - Ubuntu 22.04+
 - Python 3.11+
 - Nginx + Certbot (TLS)
-- Domain dengan DNS mengarah ke VPS
+- Domain with DNS pointing to VPS
 
 ### 1. Clone repo & install
 
 ```bash
-cd /root  # atau direktori pilihan
+cd /root
 git clone https://github.com/maulairfani/rejeki-mcp-server.git
 cd rejeki-mcp-server
 pip install -e apps/mcp-server
 pip install -e apps/auth-server
 ```
 
-### 2. Buat `users.json`
+### 2. Create `users.json`
 
 ```bash
 cp users.example.json users.json
 ```
 
-Edit `users.json` — isi username, password, dan path ke SQLite file user:
+Edit `users.json` — set username, password, and path to user's SQLite file:
 
 ```json
 {
   "irfani": {
-    "password": "password-kamu",
+    "password": "your-password",
     "db": "/root/rejeki-mcp-server/users/irfani.db"
   }
 }
 ```
 
-Buat direktori untuk database user:
+Create the user database directory:
 
 ```bash
 mkdir -p users
 ```
 
-### 3. Buat file `.env`
+### 3. Create `.env` file
 
 ```bash
 cp .env.example .env
 ```
 
-Isi `.env` sesuai domain kamu:
+Fill `.env` with your domain:
 
 ```env
-MCP_BASE_URL=https://domain-kamu.com/rejeki/mcp
-AS_BASE_URL=https://domain-kamu.com/rejeki/auth
+MCP_BASE_URL=https://your-domain.com/rejeki/mcp
+AS_BASE_URL=https://your-domain.com/rejeki/auth
 INTROSPECT_URL=http://127.0.0.1:9004/introspect
 USERS_CONFIG=/root/rejeki-mcp-server/users.json
 PORT=8001
 AUTH_PORT=9004
 ```
 
-> `USERS_CONFIG` wajib diset — tidak ada nilai default.
+> `USERS_CONFIG` must be set explicitly — there is no default fallback.
 
-### 4. Buat systemd service untuk Auth Server
+### 4. Create systemd service for Auth Server
 
 ```bash
 nano /etc/systemd/system/rejeki-auth.service
@@ -162,7 +162,7 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### 5. Buat systemd service untuk MCP Server
+### 5. Create systemd service for MCP Server
 
 ```bash
 nano /etc/systemd/system/rejeki-mcp.service
@@ -186,24 +186,24 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### 6. Aktifkan & jalankan service
+### 6. Enable & start services
 
 ```bash
 systemctl daemon-reload
 systemctl enable rejeki-auth rejeki-mcp
 systemctl start rejeki-auth rejeki-mcp
 
-# Cek status
+# Check status
 systemctl status rejeki-auth
 systemctl status rejeki-mcp
 ```
 
-### 7. Konfigurasi Nginx
+### 7. Configure Nginx
 
-Tambahkan blok berikut ke dalam `server { ... }` di config Nginx kamu (biasanya `/etc/nginx/sites-enabled/default`):
+Add the following block inside your `server { ... }` in Nginx config (usually `/etc/nginx/sites-enabled/default`):
 
 ```nginx
-# Rejeki MCP Server
+# MCP Server
 location /rejeki/mcp/ {
     proxy_pass http://127.0.0.1:8001/mcp/;
     proxy_http_version 1.1;
@@ -220,7 +220,7 @@ location /rejeki/mcp/ {
     add_header Access-Control-Expose-Headers "Mcp-Session-Id";
 }
 
-# Rejeki Auth Server
+# Auth Server
 location /rejeki/auth/ {
     proxy_pass http://127.0.0.1:9004/;
     proxy_http_version 1.1;
@@ -230,49 +230,49 @@ location /rejeki/auth/ {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
-# OAuth discovery untuk Rejeki (claude.ai membutuhkan ini di root)
+# OAuth discovery (required by MCP clients)
 location /.well-known/oauth-protected-resource/rejeki {
     proxy_pass http://127.0.0.1:8001/mcp/.well-known/oauth-protected-resource;
     proxy_set_header Host $http_host;
 }
 ```
 
-Test dan reload Nginx:
+Test and reload Nginx:
 
 ```bash
 nginx -t && systemctl reload nginx
 ```
 
-### 8. Tambah ke claude.ai
+### 8. Add to MCP client
 
-1. Buka **claude.ai → Settings → Integrations → Add**
-2. Masukkan URL: `https://domain-kamu.com/rejeki/mcp/`
-3. Login dengan username & password dari `users.json`
+1. Open your MCP client settings (e.g., **claude.ai → Settings → Integrations → Add**)
+2. Enter URL: `https://your-domain.com/rejeki/mcp/`
+3. Log in with username & password from `users.json`
 
 ---
 
-## Manajemen User
+## User Management
 
-### Tambah user baru
+### Add a new user
 
-Edit `scripts/add_user.py`, ubah `USERNAME`, `PASSWORD`, dan `DB_PATH`, lalu jalankan:
+Edit `scripts/add_user.py`, set `USERNAME`, `PASSWORD`, and `DB_PATH`, then run:
 
 ```bash
 python scripts/add_user.py
 ```
 
-Atau edit `users.json` langsung:
+Or edit `users.json` directly:
 
 ```json
 {
-  "username_baru": {
-    "password": "passwordnya",
-    "db": "/root/rejeki-mcp-server/users/username_baru.db"
+  "new_username": {
+    "password": "their-password",
+    "db": "/root/rejeki-mcp-server/users/new_username.db"
   }
 }
 ```
 
-> Perubahan `users.json` langsung aktif tanpa restart service.
+> Changes to `users.json` take effect immediately without restarting services.
 
 ---
 
@@ -291,14 +291,14 @@ systemctl restart rejeki-auth rejeki-mcp
 ## Troubleshooting
 
 ```bash
-# Lihat log realtime
+# View realtime logs
 journalctl -u rejeki-mcp -f
 journalctl -u rejeki-auth -f
 
-# Cek apakah service jalan
+# Check if services are running
 systemctl status rejeki-mcp rejeki-auth
 
-# Test endpoint langsung (bypass Nginx)
+# Test endpoints directly (bypass Nginx)
 curl http://localhost:8001/health
 curl -X POST http://localhost:9004/introspect -d "token=test"
 ```
