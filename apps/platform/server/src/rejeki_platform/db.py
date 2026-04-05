@@ -50,11 +50,41 @@ def get_conn(username: str) -> sqlite3.Connection:
 def get_accounts(username: str) -> dict:
     with get_conn(username) as conn:
         rows = conn.execute(
-            "SELECT name, type, balance FROM accounts ORDER BY type, name"
+            "SELECT id, name, type, balance FROM accounts ORDER BY type, name"
         ).fetchall()
     accounts = [dict(r) for r in rows]
     total = sum(r["balance"] for r in accounts)
     return {"accounts": accounts, "total": total}
+
+
+def create_transaction(
+    username: str,
+    amount: float,
+    type_: str,
+    account_id: int,
+    payee: str | None = None,
+    memo: str | None = None,
+    envelope_id: int | None = None,
+    to_account_id: int | None = None,
+    date: str | None = None,
+) -> dict:
+    sql = """
+        INSERT INTO transactions (amount, type, account_id, envelope_id, to_account_id, payee, memo, date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
+    """
+    with get_conn(username) as conn:
+        cur = conn.execute(sql, (amount, type_, account_id, envelope_id, to_account_id, payee, memo, date))
+        conn.commit()
+        row = conn.execute(
+            """SELECT t.id, t.date, t.type, t.amount, t.payee, t.memo,
+                      a.name AS account_name, e.name AS envelope_name
+               FROM transactions t
+               LEFT JOIN accounts a ON t.account_id = a.id
+               LEFT JOIN envelopes e ON t.envelope_id = e.id
+               WHERE t.id = ?""",
+            (cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
 
 
 def get_envelope_status(username: str, period: str) -> list[dict]:

@@ -41,3 +41,14 @@ export const getTransactions = (params?: {
   limit?: number
   offset?: number
 }) => api.get("/transactions", { params })
+
+export const postTransaction = (body: {
+  amount: number
+  type: string
+  account_id: number
+  payee?: string
+  memo?: string
+  envelope_id?: number
+  to_account_id?: number
+  date?: string
+}) => api.post("/transactions", body)
