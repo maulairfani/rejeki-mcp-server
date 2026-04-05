@@ -107,6 +107,50 @@ def get_monthly_summary(username: str, period: str) -> dict:
     return {"income": income, "expense": expense, "surplus": income - expense}
 
 
+def get_transactions(
+    username: str,
+    period: str | None = None,
+    account_id: int | None = None,
+    envelope_id: int | None = None,
+    search: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    conditions = []
+    params: list = []
+
+    if period:
+        conditions.append("strftime('%Y-%m', t.date) = ?")
+        params.append(period)
+    if account_id is not None:
+        conditions.append("t.account_id = ?")
+        params.append(account_id)
+    if envelope_id is not None:
+        conditions.append("t.envelope_id = ?")
+        params.append(envelope_id)
+    if search:
+        conditions.append("(t.payee LIKE ? OR t.memo LIKE ?)")
+        params.extend([f"%{search}%", f"%{search}%"])
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    sql = f"""
+        SELECT
+            t.id, t.date, t.type, t.amount, t.payee, t.memo,
+            a.name AS account_name,
+            e.name AS envelope_name
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN envelopes e ON t.envelope_id = e.id
+        {where}
+        ORDER BY t.date DESC
+        LIMIT ? OFFSET ?
+    """
+    params.extend([limit, offset])
+    with get_conn(username) as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_spending_trend(username: str, months: int = 6) -> dict:
     sql = """
         SELECT

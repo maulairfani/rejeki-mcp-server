@@ -5,7 +5,6 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
-    "jinja2",
     "python-dotenv",
     "itsdangerous",
     "bcrypt",

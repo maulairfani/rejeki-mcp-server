@@ -10,7 +10,8 @@ This is a monorepo with three apps:
 
 - `apps/mcp-server/` — FastMCP server exposing financial tools and prompts (port 8001)
 - `apps/auth-server/` — OAuth 2.1 authentication server (port 9004)
-- `apps/platform/` — Financial data visualization dashboard (port 8002)
+- `apps/platform/server/` — FastAPI REST API backend for the platform (port 8002)
+- `apps/platform/web/` — React + TypeScript frontend (Vite, Shadcn/ui, Tailwind)
 
 All three apps communicate only via HTTP (token introspection), not via shared Python imports.
 
@@ -21,7 +22,7 @@ All three apps communicate only via HTTP (token introspection), not via shared P
 ```bash
 pip install -e apps/mcp-server
 pip install -e apps/auth-server
-pip install -e apps/platform
+pip install -e apps/platform/server
 ```
 
 ### Run
@@ -117,7 +118,8 @@ All MCP tool wrappers use FastMCP `Context` for logging (`ctx.info()`, `ctx.erro
 
 - **MCP server**: FastMCP Context logging (`ctx.info()`) — sent to MCP client as notifications. Server-side logging via stdlib `logging` in token verifier.
 - **Auth server**: JSON structured logging via `python-json-logger`. Logs login attempts, token issuance/revocation, introspection.
-- **Platform**: JSON structured logging via `python-json-logger`. Logs login attempts.
+- **Platform backend**: JSON structured logging via `python-json-logger`. Logs login attempts.
+- **Platform frontend**: Vite dev server (`npm run dev` in `apps/platform/web/`). Proxies `/api` to port 8002. Build with `npm run build`.
 
 ## Key Design Decisions
 
