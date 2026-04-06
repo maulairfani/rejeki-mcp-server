@@ -46,6 +46,7 @@ logger = logging.getLogger("rejeki_auth")
 USERS_DB = os.environ.get("USERS_DB")
 if not USERS_DB:
     raise RuntimeError("USERS_DB env var must be set to the path of users.db")
+PLATFORM_SERVICE_SECRET = os.environ.get("PLATFORM_SERVICE_SECRET", "")
 AS_BASE_URL = os.environ.get("AS_BASE_URL", "https://maulairfani.my.id/rejeki/auth")
 MCP_SCOPE = "rejeki"
 
@@ -296,6 +297,44 @@ def make_introspect_handler(provider: RejekiOAuthProvider):
     return introspect
 
 
+# ─── SERVICE TOKEN ENDPOINT ──────────────────────────────────────────────────
+
+def make_service_token_handler(provider: RejekiOAuthProvider):
+    """Allows trusted platform backend to mint a token for a user without browser OAuth."""
+
+    async def service_token(request: Request) -> Response:
+        if not PLATFORM_SERVICE_SECRET:
+            return JSONResponse({"error": "service tokens disabled"}, status_code=403)
+
+        body = await request.json()
+        secret = body.get("service_secret", "")
+        username = body.get("username", "")
+
+        if not secret or secret != PLATFORM_SERVICE_SECRET:
+            logger.warning("service_token_bad_secret", extra={"username": username})
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+
+        user = _get_user(username)
+        if not user:
+            return JSONResponse({"error": "user not found"}, status_code=404)
+
+        token_str = f"rejeki_{secrets.token_hex(32)}"
+        expires_in = 3600 * 8
+        provider.tokens[token_str] = AccessToken(
+            token=token_str,
+            client_id="platform",
+            scopes=[MCP_SCOPE],
+            expires_at=int(time.time()) + expires_in,
+            resource=None,
+        )
+        provider.token_user[token_str] = username
+
+        logger.info("service_token_issued", extra={"username": username})
+        return JSONResponse({"access_token": token_str, "expires_in": expires_in})
+
+    return service_token
+
+
 # ─── APP FACTORY ─────────────────────────────────────────────────────────────
 
 def create_app() -> Starlette:
@@ -332,6 +371,11 @@ def create_app() -> Starlette:
             "/introspect",
             endpoint=cors_middleware(make_introspect_handler(provider), ["POST", "OPTIONS"]),
             methods=["POST", "OPTIONS"],
+        ),
+        Route(
+            "/service-token",
+            endpoint=make_service_token_handler(provider),
+            methods=["POST"],
         ),
     ]
 

@@ -52,3 +52,14 @@ export const postTransaction = (body: {
   to_account_id?: number
   date?: string
 }) => api.post("/transactions", body)
+
+// Chat
+export const sendChatMessage = (message: string): Promise<Response> =>
+  fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ message }),
+  })
+
+export const clearChatHistory = () => api.delete("/chat")

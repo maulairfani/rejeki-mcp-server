@@ -14,6 +14,7 @@ from starlette.responses import RedirectResponse
 
 from rejeki_platform.routes.auth import router as auth_router
 from rejeki_platform.routes.accounts import router as accounts_router
+from rejeki_platform.routes.chat import router as chat_router
 from rejeki_platform.routes.dashboard import router as dashboard_router
 from rejeki_platform.routes.envelopes import router as envelopes_router
 from rejeki_platform.routes.scheduled import router as scheduled_router
@@ -61,6 +62,7 @@ if os.environ.get("FORCE_HTTPS", "").lower() == "true":
     app.add_middleware(_HTTPSRedirectMiddleware)
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(accounts_router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(envelopes_router, prefix="/api/envelopes", tags=["envelopes"])
