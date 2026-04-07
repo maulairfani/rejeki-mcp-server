@@ -1,5 +1,5 @@
 """
-LangGraph agent for the Rejeki chat page — custom StateGraph build.
+LangGraph agent for the Envel chat page — custom StateGraph build.
 
 Graph structure:
   START → reason → act → tools → reason (loop)
@@ -32,7 +32,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from typing_extensions import TypedDict
 
-logger = logging.getLogger("rejeki_platform.agent")
+logger = logging.getLogger("envel_platform.agent")
 
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ class AgentState(TypedDict):
 # ─── PROMPTS ─────────────────────────────────────────────────────────────────
 
 _REASON_SYSTEM = """\
-You are Rejeki, an AI personal finance assistant using envelope budgeting.
+You are Envel, an AI personal finance assistant using envelope budgeting.
 All amounts are in IDR (Rupiah). Format currency as "Rp X.XXX.XXX".
 
 ## Your memory about this user:
@@ -72,7 +72,7 @@ Write your reasoning concisely. Do NOT call any tools. Do NOT answer the user ye
 Just think out loud."""
 
 _ACT_SYSTEM = """\
-You are Rejeki, an AI personal finance assistant using envelope budgeting.
+You are Envel, an AI personal finance assistant using envelope budgeting.
 All amounts are in IDR (Rupiah). Format currency as "Rp X.XXX.XXX".
 
 When a user first contacts you with no prior context, call \

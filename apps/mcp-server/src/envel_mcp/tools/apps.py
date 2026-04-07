@@ -2,9 +2,9 @@ from datetime import date
 from pathlib import Path
 
 from fastmcp import FastMCP
-from rejeki_mcp.deps import get_user_db
-from rejeki_mcp.tools.analytics import get_ready_to_assign
-from rejeki_mcp.tools.envelopes import get_envelopes
+from envel_mcp.deps import get_user_db
+from envel_mcp.tools.analytics import get_ready_to_assign
+from envel_mcp.tools.envelopes import get_envelopes
 
 _UI_FILE = Path(__file__).parent.parent / "ui" / "budget-allocator.html"
 
@@ -12,7 +12,7 @@ mcp = FastMCP("apps")
 
 
 @mcp.resource(
-    "ui://rejeki/budget-allocator",
+    "ui://envel/budget-allocator",
     name="BudgetAllocatorUI",
     mime_type="text/html;profile=mcp-app",
 )
@@ -22,7 +22,7 @@ def _budget_allocator_ui() -> str:
 
 @mcp.tool(
     name="budget_allocator",
-    meta={"ui": {"resourceUri": "ui://rejeki/budget-allocator"}},
+    meta={"ui": {"resourceUri": "ui://envel/budget-allocator"}},
 )
 async def _budget_allocator_mcp(period: str | None = None) -> dict:
     """

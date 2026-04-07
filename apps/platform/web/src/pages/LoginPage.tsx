@@ -34,9 +34,9 @@ export function LoginPage() {
       <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-sidebar p-10">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded bg-sidebar-primary flex items-center justify-center">
-            <span className="text-sm font-bold text-sidebar-primary-foreground">R</span>
+            <span className="text-sm font-bold text-sidebar-primary-foreground">E</span>
           </div>
-          <span className="font-semibold text-sidebar-foreground text-lg">Rejeki</span>
+          <span className="font-semibold text-sidebar-foreground text-lg">Envel</span>
         </div>
         <blockquote className="space-y-2">
           <p className="text-sidebar-foreground/70 text-sm leading-relaxed">
@@ -52,9 +52,9 @@ export function LoginPage() {
           {/* Mobile logo */}
           <div className="flex items-center gap-2 lg:hidden">
             <div className="w-7 h-7 rounded bg-primary flex items-center justify-center">
-              <span className="text-sm font-bold text-primary-foreground">R</span>
+              <span className="text-sm font-bold text-primary-foreground">E</span>
             </div>
-            <span className="font-semibold text-lg">Rejeki</span>
+            <span className="font-semibold text-lg">Envel</span>
           </div>
 
           <div className="space-y-1">

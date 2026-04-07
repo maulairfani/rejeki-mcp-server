@@ -37,9 +37,9 @@ export function AppSidebar() {
       <SidebarHeader className="px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded bg-sidebar-primary flex items-center justify-center">
-            <span className="text-xs font-bold text-sidebar-primary-foreground">R</span>
+            <span className="text-xs font-bold text-sidebar-primary-foreground">E</span>
           </div>
-          <span className="font-semibold text-sidebar-foreground">Rejeki</span>
+          <span className="font-semibold text-sidebar-foreground">Envel</span>
         </div>
       </SidebarHeader>
 

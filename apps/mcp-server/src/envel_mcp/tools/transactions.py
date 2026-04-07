@@ -1,5 +1,5 @@
 from datetime import date
-from rejeki_mcp.database import Database
+from envel_mcp.database import Database
 
 
 def add_transaction(
@@ -183,7 +183,7 @@ def get_transactions(
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from fastmcp.server.dependencies import CurrentContext
-from rejeki_mcp.deps import get_user_db
+from envel_mcp.deps import get_user_db
 
 mcp = FastMCP("transactions")
 

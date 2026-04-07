@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 
 USERS_DB = Path(__file__).parent.parent / "users.db"
-SCHEMA = Path(__file__).parent.parent / "apps/mcp-server/src/rejeki_mcp/schema.sql"
+SCHEMA = Path(__file__).parent.parent / "apps/mcp-server/src/envel_mcp/schema.sql"
 
 
 def get_user_db_path(username: str, users_db: Path) -> str:

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from rejeki_platform.auth import require_user
-from rejeki_platform.db import create_transaction, get_transactions
+from envel_platform.auth import require_user
+from envel_platform.db import create_transaction, get_transactions
 
 router = APIRouter()
 

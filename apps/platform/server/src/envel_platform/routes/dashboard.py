@@ -2,8 +2,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends
 
-from rejeki_platform.auth import require_user
-from rejeki_platform.db import get_accounts, get_envelope_status, get_monthly_summary, get_spending_trend
+from envel_platform.auth import require_user
+from envel_platform.db import get_accounts, get_envelope_status, get_monthly_summary, get_spending_trend
 
 router = APIRouter()
 

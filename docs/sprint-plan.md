@@ -33,10 +33,9 @@
 
 ### Exploration Backlog (Post-MVP)
 
-- Push-based morning summary (email/notification)
+- **Push notifications via ntfy.sh (self-hosted)** — scheduled transaction reminders + morning summary; self-host ntfy on VPS, per-user topics, Android via F-Droid (no Firebase), iOS via ntfy.sh upstream relay
 - MCP prompt for instructing clients to create skills
 - Platform UI/UX deep design exploration
-- Morning summary as scheduled push (email/notification)
 - Subscription/monetization
 - MCP Apps
 

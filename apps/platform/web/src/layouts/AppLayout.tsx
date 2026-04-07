@@ -14,7 +14,7 @@ const pageTitles: Record<string, string> = {
 
 export function AppLayout() {
   const { pathname } = useLocation()
-  const title = pageTitles[pathname] ?? "Rejeki"
+  const title = pageTitles[pathname] ?? "Envel"
 
   return (
     <AuthGuard>

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from rejeki_platform.auth import require_user
-from rejeki_platform.db import get_accounts
+from envel_platform.auth import require_user
+from envel_platform.db import get_accounts
 
 router = APIRouter()
 

@@ -1,5 +1,5 @@
 [project]
-name = "rejeki_platform"
+name = "envel_platform"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-rejeki-platform = "rejeki_platform.server:main"
+envel-platform = "envel_platform.server:main"
 
 [build-system]
 requires = ["setuptools>=42"]

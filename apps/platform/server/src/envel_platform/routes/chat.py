@@ -10,10 +10,10 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from rejeki_platform.agent import build_agent, get_mcp_token, update_memory
-from rejeki_platform.auth import require_user
+from envel_platform.agent import build_agent, get_mcp_token, update_memory
+from envel_platform.auth import require_user
 
-logger = logging.getLogger("rejeki_platform.chat")
+logger = logging.getLogger("envel_platform.chat")
 
 router = APIRouter()
 
@@ -104,7 +104,7 @@ async def chat(body: ChatRequest, username: str = Depends(require_user)):
 async def clear_history(username: str = Depends(require_user)):
     """Clear conversation history for the current user."""
     import aiosqlite
-    from rejeki_platform.agent import CHECKPOINTS_DB
+    from envel_platform.agent import CHECKPOINTS_DB
 
     thread_id = f"chat-{username}"
     try:

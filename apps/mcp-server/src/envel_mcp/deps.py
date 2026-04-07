@@ -5,9 +5,9 @@ import sqlite3
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from rejeki_mcp.database import Database, init_db
+from envel_mcp.database import Database, init_db
 
-# Set per-request by RejekiTokenVerifier after successful token introspection.
+# Set per-request by EnvelTokenVerifier after successful token introspection.
 _db_path: ContextVar[str] = ContextVar("db_path")
 _db_username: ContextVar[str] = ContextVar("db_username")
 
@@ -36,7 +36,7 @@ def get_user_db():
     try:
         path = _db_path.get()
     except LookupError:
-        path = os.environ.get("TEST_DB", os.path.expanduser("~/rejeki.db"))
+        path = os.environ.get("TEST_DB", os.path.expanduser("~/envel.db"))
 
     try:
         username = _db_username.get()

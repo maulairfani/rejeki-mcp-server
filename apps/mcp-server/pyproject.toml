@@ -1,11 +1,11 @@
 [project]
-name = "rejeki_mcp"
+name = "envel_mcp"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = ["fastmcp", "httpx", "python-dotenv", "sqlcipher3-wheels"]
 
 [project.scripts]
-rejeki = "rejeki_mcp.server:main"
+envel = "envel_mcp.server:main"
 
 [build-system]
 requires = ["setuptools>=42"]

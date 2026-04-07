@@ -29,13 +29,13 @@ pip install -e apps/platform/server
 
 ```bash
 # MCP server
-rejeki
+envel
 
 # Auth server
-rejeki-auth
+envel-auth
 
 # Platform dashboard
-rejeki-platform
+envel-platform
 ```
 
 ### Minimal `.env` for local testing
@@ -50,8 +50,8 @@ With these set, `TestTokenVerifier` activates — no auth server needed.
 ### Production (VPS)
 
 ```bash
-systemctl start rejeki-auth rejeki-mcp
-journalctl -u rejeki-mcp -f
+systemctl start envel-auth envel-mcp
+journalctl -u envel-mcp -f
 ```
 
 ## Architecture
@@ -59,14 +59,14 @@ journalctl -u rejeki-mcp -f
 ### Request Flow
 
 ```text
-MCP client → Nginx → /rejeki/mcp/  → MCP Server  (port 8001)
-                   → /rejeki/auth/ → Auth Server (port 9004)
+MCP client → Nginx → /envel/mcp/  → MCP Server  (port 8001)
+                   → /envel/auth/ → Auth Server (port 9004)
 Browser    → Nginx → /              → Platform    (port 8002)
 ```
 
 ### Per-User Database Isolation
 
-Each user has their own SQLite database. The path is stored in `users.db` (a shared SQLite database with hashed credentials) and injected via a `ContextVar` (`_db_path` in `apps/mcp-server/src/rejeki_mcp/deps.py`) when a token is verified. All tools access the database through `get_user_db()` context manager in `deps.py`, which also auto-initializes schema from `schema.sql` on first access.
+Each user has their own SQLite database. The path is stored in `users.db` (a shared SQLite database with hashed credentials) and injected via a `ContextVar` (`_db_path` in `apps/mcp-server/src/envel_mcp/deps.py`) when a token is verified. All tools access the database through `get_user_db()` context manager in `deps.py`, which also auto-initializes schema from `schema.sql` on first access.
 
 ### User Authentication
 
@@ -78,14 +78,14 @@ python scripts/add_user.py <username> <password> [--db-path PATH]
 
 ### Token Verification
 
-`apps/mcp-server/src/rejeki_mcp/server.py` defines two verifiers:
+`apps/mcp-server/src/envel_mcp/server.py` defines two verifiers:
 
-- **`RejekiTokenVerifier`** — production; calls `INTROSPECT_URL` on the auth server to resolve token → DB path
+- **`EnvelTokenVerifier`** — production; calls `INTROSPECT_URL` on the auth server to resolve token → DB path
 - **`TestTokenVerifier`** — development; accepts `TEST_TOKEN` env var and uses `TEST_DB` path
 
 ### Tool Organization
 
-Tools are implemented as FastMCP sub-servers in `apps/mcp-server/src/rejeki_mcp/tools/` and mounted under a "finance" namespace in the main server. Prompts are in `apps/mcp-server/src/rejeki_mcp/prompts/`.
+Tools are implemented as FastMCP sub-servers in `apps/mcp-server/src/envel_mcp/tools/` and mounted under a "finance" namespace in the main server. Prompts are in `apps/mcp-server/src/envel_mcp/prompts/`.
 
 All MCP tool wrappers use FastMCP `Context` for logging (`ctx.info()`, `ctx.error()`), which sends log notifications to the MCP client.
 
@@ -112,7 +112,7 @@ All MCP tool wrappers use FastMCP `Context` for logging (`ctx.info()`, `ctx.erro
 
 ### Database Schema
 
-8 tables in `apps/mcp-server/src/rejeki_mcp/schema.sql`: `accounts`, `envelope_groups`, `envelopes`, `budget_periods`, `transactions`, `scheduled_transactions`, `wishlist`. Budget allocation is tracked per-envelope per-month in `budget_periods` with `assigned` and `carryover` columns.
+8 tables in `apps/mcp-server/src/envel_mcp/schema.sql`: `accounts`, `envelope_groups`, `envelopes`, `budget_periods`, `transactions`, `scheduled_transactions`, `wishlist`. Budget allocation is tracked per-envelope per-month in `budget_periods` with `assigned` and `carryover` columns.
 
 ### Logging
 
@@ -125,5 +125,5 @@ All MCP tool wrappers use FastMCP `Context` for logging (`ctx.info()`, `ctx.erro
 
 - **`users.db`** (gitignored) stores usernames, bcrypt-hashed passwords, and db_path. `USERS_DB` env var must be set explicitly.
 - **`*.db` files** are gitignored. Each user's financial data lives in their own SQLite file.
-- The `apps/mcp-server/server.py` is a thin re-export shim for deployment entrypoints; real logic is in `src/rejeki_mcp/server.py`.
+- The `apps/mcp-server/server.py` is a thin re-export shim for deployment entrypoints; real logic is in `src/envel_mcp/server.py`.
 - There are no tests or linting configs in this project currently.

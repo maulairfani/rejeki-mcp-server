@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from rejeki_mcp.database import Database
+from envel_mcp.database import Database
 
 
 def _current_period() -> str:
@@ -241,7 +241,7 @@ def get_onboarding_status(db: Database) -> dict:
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from fastmcp.server.dependencies import CurrentContext
-from rejeki_mcp.deps import get_user_db
+from envel_mcp.deps import get_user_db
 
 mcp = FastMCP("analytics")
 

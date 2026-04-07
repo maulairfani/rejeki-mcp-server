@@ -5,7 +5,7 @@ import sqlite3
 import bcrypt
 from fastapi import Request
 
-logger = logging.getLogger("rejeki_platform")
+logger = logging.getLogger("envel_platform")
 
 
 class NotAuthenticated(Exception):

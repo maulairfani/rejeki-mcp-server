@@ -11,20 +11,20 @@ from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Mount, Route
 
-from rejeki_mcp.deps import _db_path, _db_username
-from rejeki_mcp.prompts.budget import mcp as _budget_prompts_mcp
-from rejeki_mcp.prompts.onboarding import mcp as _onboarding_prompts_mcp
-from rejeki_mcp.tools.accounts import mcp as _accounts_mcp
-from rejeki_mcp.tools.analytics import mcp as _analytics_mcp
-from rejeki_mcp.tools.apps import mcp as _apps_mcp
-from rejeki_mcp.tools.envelopes import mcp as _envelopes_mcp
-from rejeki_mcp.tools.scheduled import mcp as _scheduled_mcp
-from rejeki_mcp.tools.transactions import mcp as _transactions_mcp
-from rejeki_mcp.tools.wishlist import mcp as _wishlist_mcp
+from envel_mcp.deps import _db_path, _db_username
+from envel_mcp.prompts.budget import mcp as _budget_prompts_mcp
+from envel_mcp.prompts.onboarding import mcp as _onboarding_prompts_mcp
+from envel_mcp.tools.accounts import mcp as _accounts_mcp
+from envel_mcp.tools.analytics import mcp as _analytics_mcp
+from envel_mcp.tools.apps import mcp as _apps_mcp
+from envel_mcp.tools.envelopes import mcp as _envelopes_mcp
+from envel_mcp.tools.scheduled import mcp as _scheduled_mcp
+from envel_mcp.tools.transactions import mcp as _transactions_mcp
+from envel_mcp.tools.wishlist import mcp as _wishlist_mcp
 
 load_dotenv()
 
-logger = logging.getLogger("rejeki_mcp")
+logger = logging.getLogger("envel_mcp")
 
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ INTROSPECT_URL = os.environ.get("INTROSPECT_URL", "http://127.0.0.1:9004/introsp
 
 # ─── TOKEN VERIFIER ──────────────────────────────────────────────────────────
 
-class RejekiTokenVerifier(TokenVerifier):
+class EnvelTokenVerifier(TokenVerifier):
     """Validates OAuth tokens via introspection and injects per-user db_path."""
 
     async def verify_token(self, token: str) -> AccessToken | None:
@@ -58,7 +58,7 @@ class RejekiTokenVerifier(TokenVerifier):
             return None
 
         username = data.get("username", data.get("client_id", "unknown"))
-        db = data.get("db", os.path.expanduser("~/rejeki.db"))
+        db = data.get("db", os.path.expanduser("~/envel.db"))
         _db_path.set(db)
         _db_username.set(username)
 
@@ -85,7 +85,7 @@ class TestTokenVerifier(TokenVerifier):
         return AccessToken(
             token=token,
             client_id="test-user-eval-001",
-            scopes=["rejeki"],
+            scopes=["envel"],
         )
 
 
@@ -95,9 +95,9 @@ _test_token = os.environ.get("TEST_TOKEN")
 if _test_token:
     _token_verifier: TokenVerifier = TestTokenVerifier(_test_token)
 else:
-    _token_verifier = RejekiTokenVerifier()
+    _token_verifier = EnvelTokenVerifier()
 
-_rejeki_icon = Icon(
+_envel_icon = Icon(
     src="data:image/svg+xml," + quote(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
         '<text y="26" font-size="28">💰</text></svg>'
@@ -106,8 +106,8 @@ _rejeki_icon = Icon(
 )
 
 mcp = FastMCP(
-    "rejeki",
-    icons=[_rejeki_icon],
+    "envel",
+    icons=[_envel_icon],
     auth=_token_verifier,
     instructions=(
         "Personal envelope-budgeting application. "
@@ -153,7 +153,7 @@ def main():
     import uvicorn
     port = int(os.environ.get("PORT", 8001))
     uvicorn.run(
-        "rejeki_mcp.server:app",
+        "envel_mcp.server:app",
         host="0.0.0.0",
         port=port,
         reload=False,

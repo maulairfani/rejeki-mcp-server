@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from rejeki_platform.auth import NotAuthenticated, check_credentials, require_user
+from envel_platform.auth import NotAuthenticated, check_credentials, require_user
 
 router = APIRouter()
 

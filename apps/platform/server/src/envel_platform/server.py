@@ -12,13 +12,13 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
-from rejeki_platform.routes.auth import router as auth_router
-from rejeki_platform.routes.accounts import router as accounts_router
-from rejeki_platform.routes.chat import router as chat_router
-from rejeki_platform.routes.dashboard import router as dashboard_router
-from rejeki_platform.routes.envelopes import router as envelopes_router
-from rejeki_platform.routes.scheduled import router as scheduled_router
-from rejeki_platform.routes.transactions import router as transactions_router
+from envel_platform.routes.auth import router as auth_router
+from envel_platform.routes.accounts import router as accounts_router
+from envel_platform.routes.chat import router as chat_router
+from envel_platform.routes.dashboard import router as dashboard_router
+from envel_platform.routes.envelopes import router as envelopes_router
+from envel_platform.routes.scheduled import router as scheduled_router
+from envel_platform.routes.transactions import router as transactions_router
 
 load_dotenv()
 
@@ -29,7 +29,7 @@ if not _SESSION_SECRET and not os.environ.get("TEST_TOKEN"):
         "Set it to a long random string (e.g. openssl rand -hex 32)."
     )
 
-app = FastAPI(title="Rejeki Platform API")
+app = FastAPI(title="Envel Platform API")
 
 _secure_cookies = os.environ.get("SECURE_COOKIES", "").lower() == "true"
 app.add_middleware(
@@ -90,8 +90,8 @@ def main():
     handler.setFormatter(JsonFormatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
     logging.root.handlers = [handler]
     logging.root.setLevel(logging.INFO)
-    logging.getLogger("rejeki_platform").info("server_start", extra={"port": port})
-    uvicorn.run("rejeki_platform.server:app", host="0.0.0.0", port=port, reload=False)
+    logging.getLogger("envel_platform").info("server_start", extra={"port": port})
+    uvicorn.run("envel_platform.server:app", host="0.0.0.0", port=port, reload=False)
 
 
 if __name__ == "__main__":

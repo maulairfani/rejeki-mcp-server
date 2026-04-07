@@ -3,8 +3,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from rejeki_platform.auth import require_user
-from rejeki_platform.db import assign_envelope, get_envelope_status
+from envel_platform.auth import require_user
+from envel_platform.db import assign_envelope, get_envelope_status
 
 router = APIRouter()
 

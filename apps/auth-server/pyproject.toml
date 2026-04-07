@@ -1,11 +1,11 @@
 [project]
-name = "rejeki_auth"
+name = "envel_auth"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = ["fastmcp", "uvicorn[standard]", "starlette", "pydantic", "python-dotenv", "bcrypt", "python-json-logger"]
 
 [project.scripts]
-rejeki-auth = "rejeki_auth.server:main"
+envel-auth = "envel_auth.server:main"
 
 [build-system]
 requires = ["setuptools>=42"]

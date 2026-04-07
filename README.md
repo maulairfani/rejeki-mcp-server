@@ -13,8 +13,8 @@ MCP Client (Claude, Cursor, etc.)
    │
    ▼ HTTPS
 Nginx (reverse proxy)
-   ├── /rejeki/mcp/   → MCP Server  (port 8001)
-   └── /rejeki/auth/  → Auth Server (port 9004)
+   ├── /envel/mcp/   → MCP Server  (port 8001)
+   └── /envel/auth/  → Auth Server (port 9004)
 ```
 
 Monorepo with three apps in the `apps/` folder:
@@ -30,8 +30,8 @@ Monorepo with three apps in the `apps/` folder:
 ### 1. Clone & install dependencies
 
 ```bash
-git clone https://github.com/maulairfani/rejeki-mcp-server.git
-cd rejeki-mcp-server
+git clone https://github.com/maulairfani/envel-mcp-server.git
+cd envel-mcp-server
 pip install -e apps/mcp-server
 pip install -e apps/auth-server
 pip install -e apps/platform
@@ -54,13 +54,13 @@ TEST_DB=./users/test.db
 
 ```bash
 # MCP server (port 8001)
-rejeki
+envel
 
 # Auth server (port 9004) — optional for dev, just use TEST_TOKEN
-rejeki-auth
+envel-auth
 
 # Platform dashboard (port 8002)
-rejeki-platform
+envel-platform
 ```
 
 MCP server health check:
@@ -90,8 +90,8 @@ Use MCP Inspector or add to your MCP client config with `TEST_TOKEN`.
 
 ```bash
 cd /root
-git clone https://github.com/maulairfani/rejeki-mcp-server.git
-cd rejeki-mcp-server
+git clone https://github.com/maulairfani/envel-mcp-server.git
+cd envel-mcp-server
 pip install -e apps/mcp-server
 pip install -e apps/auth-server
 ```
@@ -100,7 +100,7 @@ pip install -e apps/auth-server
 
 ```bash
 mkdir -p users
-python scripts/add_user.py irfani your-password --db-path /root/rejeki-mcp-server/users/irfani.db
+python scripts/add_user.py irfani your-password --db-path /root/envel-mcp-server/users/irfani.db
 ```
 
 This creates `users.db` with bcrypt-hashed credentials.
@@ -114,10 +114,10 @@ cp .env.example .env
 Fill `.env` with your domain:
 
 ```env
-MCP_BASE_URL=https://your-domain.com/rejeki/mcp
-AS_BASE_URL=https://your-domain.com/rejeki/auth
+MCP_BASE_URL=https://your-domain.com/envel/mcp
+AS_BASE_URL=https://your-domain.com/envel/auth
 INTROSPECT_URL=http://127.0.0.1:9004/introspect
-USERS_DB=/root/rejeki-mcp-server/users.db
+USERS_DB=/root/envel-mcp-server/users.db
 PORT=8001
 AUTH_PORT=9004
 ```
@@ -127,20 +127,20 @@ AUTH_PORT=9004
 ### 4. Create systemd service for Auth Server
 
 ```bash
-nano /etc/systemd/system/rejeki-auth.service
+nano /etc/systemd/system/envel-auth.service
 ```
 
 ```ini
 [Unit]
-Description=Rejeki Auth Server
+Description=Envel Auth Server
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/rejeki-mcp-server
-EnvironmentFile=/root/rejeki-mcp-server/.env
-ExecStart=rejeki-auth
+WorkingDirectory=/root/envel-mcp-server
+EnvironmentFile=/root/envel-mcp-server/.env
+ExecStart=envel-auth
 Restart=on-failure
 RestartSec=5
 
@@ -151,20 +151,20 @@ WantedBy=multi-user.target
 ### 5. Create systemd service for MCP Server
 
 ```bash
-nano /etc/systemd/system/rejeki-mcp.service
+nano /etc/systemd/system/envel-mcp.service
 ```
 
 ```ini
 [Unit]
-Description=Rejeki MCP Server
-After=network.target rejeki-auth.service
+Description=Envel MCP Server
+After=network.target envel-auth.service
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/rejeki-mcp-server
-EnvironmentFile=/root/rejeki-mcp-server/.env
-ExecStart=rejeki
+WorkingDirectory=/root/envel-mcp-server
+EnvironmentFile=/root/envel-mcp-server/.env
+ExecStart=envel
 Restart=on-failure
 RestartSec=5
 
@@ -176,12 +176,12 @@ WantedBy=multi-user.target
 
 ```bash
 systemctl daemon-reload
-systemctl enable rejeki-auth rejeki-mcp
-systemctl start rejeki-auth rejeki-mcp
+systemctl enable envel-auth envel-mcp
+systemctl start envel-auth envel-mcp
 
 # Check status
-systemctl status rejeki-auth
-systemctl status rejeki-mcp
+systemctl status envel-auth
+systemctl status envel-mcp
 ```
 
 ### 7. Configure Nginx
@@ -190,7 +190,7 @@ Add the following block inside your `server { ... }` in Nginx config (usually `/
 
 ```nginx
 # MCP Server
-location /rejeki/mcp/ {
+location /envel/mcp/ {
     proxy_pass http://127.0.0.1:8001/mcp/;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
@@ -207,7 +207,7 @@ location /rejeki/mcp/ {
 }
 
 # Auth Server
-location /rejeki/auth/ {
+location /envel/auth/ {
     proxy_pass http://127.0.0.1:9004/;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
@@ -217,7 +217,7 @@ location /rejeki/auth/ {
 }
 
 # OAuth discovery (required by MCP clients)
-location /.well-known/oauth-protected-resource/rejeki {
+location /.well-known/oauth-protected-resource/envel {
     proxy_pass http://127.0.0.1:8001/mcp/.well-known/oauth-protected-resource;
     proxy_set_header Host $http_host;
 }
@@ -232,7 +232,7 @@ nginx -t && systemctl reload nginx
 ### 8. Add to MCP client
 
 1. Open your MCP client settings (e.g., **claude.ai → Settings → Integrations → Add**)
-2. Enter URL: `https://your-domain.com/rejeki/mcp/`
+2. Enter URL: `https://your-domain.com/envel/mcp/`
 3. Log in with username & password from `users.json`
 
 ---
@@ -260,11 +260,11 @@ python scripts/add_user.py new_username their-password --db-path /path/to/new_us
 ## Update Deployment
 
 ```bash
-cd /root/rejeki-mcp-server
+cd /root/envel-mcp-server
 git pull
 pip install -e apps/mcp-server
 pip install -e apps/auth-server
-systemctl restart rejeki-auth rejeki-mcp
+systemctl restart envel-auth envel-mcp
 ```
 
 ---
@@ -273,11 +273,11 @@ systemctl restart rejeki-auth rejeki-mcp
 
 ```bash
 # View realtime logs
-journalctl -u rejeki-mcp -f
-journalctl -u rejeki-auth -f
+journalctl -u envel-mcp -f
+journalctl -u envel-auth -f
 
 # Check if services are running
-systemctl status rejeki-mcp rejeki-auth
+systemctl status envel-mcp envel-auth
 
 # Test endpoints directly (bypass Nginx)
 curl http://localhost:8001/health

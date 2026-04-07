@@ -39,7 +39,7 @@ from mcp.server.auth.routes import cors_middleware, create_auth_routes
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
-logger = logging.getLogger("rejeki_auth")
+logger = logging.getLogger("envel_auth")
 
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 
@@ -47,8 +47,8 @@ USERS_DB = os.environ.get("USERS_DB")
 if not USERS_DB:
     raise RuntimeError("USERS_DB env var must be set to the path of users.db")
 PLATFORM_SERVICE_SECRET = os.environ.get("PLATFORM_SERVICE_SECRET", "")
-AS_BASE_URL = os.environ.get("AS_BASE_URL", "https://maulairfani.my.id/rejeki/auth")
-MCP_SCOPE = "rejeki"
+AS_BASE_URL = os.environ.get("AS_BASE_URL", "https://maulairfani.my.id/envel/auth")
+MCP_SCOPE = "envel"
 
 CREATE_USERS_TABLE = """
 CREATE TABLE IF NOT EXISTS users (
@@ -78,7 +78,7 @@ def _get_user(username: str) -> dict | None:
 
 # ─── OAUTH PROVIDER ──────────────────────────────────────────────────────────
 
-class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, RefreshToken, AccessToken]):
+class EnvelOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, RefreshToken, AccessToken]):
     """OAuth provider backed by users.db credentials."""
 
     def __init__(self, base_url: str):
@@ -134,7 +134,7 @@ class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
         if not client.client_id:
             raise ValueError("No client_id")
 
-        token_str = f"rejeki_{secrets.token_hex(32)}"
+        token_str = f"envel_{secrets.token_hex(32)}"
         username = getattr(authorization_code, "_username", "unknown")
 
         self.tokens[token_str] = AccessToken(
@@ -266,7 +266,7 @@ class RejekiOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
 
 # ─── INTROSPECT ENDPOINT ─────────────────────────────────────────────────────
 
-def make_introspect_handler(provider: RejekiOAuthProvider):
+def make_introspect_handler(provider: EnvelOAuthProvider):
     async def introspect(request: Request) -> Response:
         form = await request.form()
         token = form.get("token")
@@ -299,7 +299,7 @@ def make_introspect_handler(provider: RejekiOAuthProvider):
 
 # ─── SERVICE TOKEN ENDPOINT ──────────────────────────────────────────────────
 
-def make_service_token_handler(provider: RejekiOAuthProvider):
+def make_service_token_handler(provider: EnvelOAuthProvider):
     """Allows trusted platform backend to mint a token for a user without browser OAuth."""
 
     async def service_token(request: Request) -> Response:
@@ -318,7 +318,7 @@ def make_service_token_handler(provider: RejekiOAuthProvider):
         if not user:
             return JSONResponse({"error": "user not found"}, status_code=404)
 
-        token_str = f"rejeki_{secrets.token_hex(32)}"
+        token_str = f"envel_{secrets.token_hex(32)}"
         expires_in = 3600 * 8
         provider.tokens[token_str] = AccessToken(
             token=token_str,
@@ -338,7 +338,7 @@ def make_service_token_handler(provider: RejekiOAuthProvider):
 # ─── APP FACTORY ─────────────────────────────────────────────────────────────
 
 def create_app() -> Starlette:
-    provider = RejekiOAuthProvider(base_url=AS_BASE_URL)
+    provider = EnvelOAuthProvider(base_url=AS_BASE_URL)
 
     issuer_url = AnyHttpUrl(AS_BASE_URL)
     auth_settings = AuthSettings(
@@ -396,7 +396,7 @@ def main():
     logging.root.setLevel(logging.INFO)
 
     logger.info("server_start", extra={"port": port})
-    uvicorn.run("rejeki_auth.server:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("envel_auth.server:app", host="0.0.0.0", port=port, reload=False)
 
 
 if __name__ == "__main__":
