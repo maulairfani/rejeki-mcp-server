@@ -69,7 +69,7 @@ export function TransactionRow({ transaction, showNominal }: TransactionRowProps
     transaction.type === "transfer" ? null : transaction.account
 
   return (
-    <div className="flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-muted/50 rounded-md">
+    <div className="flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-muted/50 border-b border-border last:border-b-0">
       {/* Icon */}
       <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-base leading-none">
         {icon}
