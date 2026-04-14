@@ -59,9 +59,9 @@ export function TransactionFilters({
       </div>
 
       {/* Filter row */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         {/* Type pills */}
-        <div className="flex gap-1" role="group" aria-label="Filter by type">
+        <div className="flex gap-1 shrink-0" role="group" aria-label="Filter by type">
           {TYPE_OPTIONS.map((opt) => {
             const active = filters.type === opt.value
             return (

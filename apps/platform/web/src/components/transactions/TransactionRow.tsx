@@ -48,23 +48,19 @@ interface TransactionRowProps {
 export function TransactionRow({ transaction, showNominal }: TransactionRowProps) {
   const style = TYPE_STYLE[transaction.type]
 
-  // Icon: envelope emoji for expense, fallback for income/transfer
   const icon =
     transaction.type === "expense" && transaction.envelope
       ? ENVELOPE_ICONS[transaction.envelope] ?? style.fallbackIcon
       : style.fallbackIcon
 
-  // Payee: always filled — who/what
   const payee =
     transaction.type === "transfer"
       ? `${transaction.account} → ${transaction.toAccount}`
       : transaction.payee ?? "—"
 
-  // Envelope: only for expense
   const envelope =
     transaction.type === "expense" ? transaction.envelope : null
 
-  // Account: source account (skip for transfer since it's in payee)
   const account =
     transaction.type === "transfer" ? null : transaction.account
 
@@ -75,13 +71,17 @@ export function TransactionRow({ transaction, showNominal }: TransactionRowProps
         {icon}
       </div>
 
-      {/* Payee */}
+      {/* Payee + envelope subtitle (mobile) / payee only (desktop) */}
       <div className="flex-1 min-w-0">
         <p className="truncate text-[13px] font-medium">{payee}</p>
+        {/* Mobile: show envelope + account as subtitle */}
+        <p className="truncate text-[11px] text-muted-foreground md:hidden">
+          {[envelope, account].filter(Boolean).join(" · ") || "\u00A0"}
+        </p>
       </div>
 
-      {/* Envelope */}
-      <div className="shrink-0 w-[100px]">
+      {/* Envelope — desktop only */}
+      <div className="shrink-0 w-[100px] hidden md:block">
         {envelope ? (
           <p className="truncate text-[12px] text-muted-foreground">{envelope}</p>
         ) : (
@@ -89,8 +89,8 @@ export function TransactionRow({ transaction, showNominal }: TransactionRowProps
         )}
       </div>
 
-      {/* Account */}
-      <div className="shrink-0 w-[70px]">
+      {/* Account — desktop only */}
+      <div className="shrink-0 w-[70px] hidden md:block">
         {account ? (
           <p className="truncate text-[12px] text-muted-foreground">{account}</p>
         ) : (
@@ -99,7 +99,7 @@ export function TransactionRow({ transaction, showNominal }: TransactionRowProps
       </div>
 
       {/* Amount */}
-      <div className="shrink-0 text-right w-[110px]">
+      <div className="shrink-0 text-right">
         <span className={`text-[13px] font-medium tabular-nums ${style.color}`}>
           {showNominal
             ? `${style.sign}${formatIDR(transaction.amount)}`
