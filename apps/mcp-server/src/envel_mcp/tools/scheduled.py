@@ -1,7 +1,7 @@
 import calendar
 from datetime import date, timedelta
 from envel_mcp.database import Database
-from envel_mcp.tools.transactions import add_transaction
+from envel_mcp.tools.transactions import add_transaction, _check_envelope_active
 
 
 def _next_date(date_str: str, recurrence: str) -> str:
@@ -33,6 +33,7 @@ def add_scheduled_transaction(
     memo: str | None = None,
     recurrence: str = "once",
 ) -> dict:
+    _check_envelope_active(db, envelope_id)
     id = db.execute(
         """INSERT INTO scheduled_transactions
            (amount, type, envelope_id, account_id, to_account_id, payee, memo, scheduled_date, recurrence)

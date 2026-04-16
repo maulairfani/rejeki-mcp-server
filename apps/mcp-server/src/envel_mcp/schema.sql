@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS envelopes (
     group_id        INTEGER REFERENCES envelope_groups(id),
     target_type     TEXT CHECK (target_type IN ('monthly_spending', 'monthly_savings', 'savings_balance', 'needed_by_date')),
     target_amount   REAL,
-    target_deadline TEXT
+    target_deadline TEXT,
+    archived        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS transactions (

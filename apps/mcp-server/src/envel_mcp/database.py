@@ -37,3 +37,12 @@ def init_db(db: Database) -> None:
     for stmt in statements:
         db._conn.execute(stmt)
     db._conn.commit()
+    _migrate(db)
+
+
+def _migrate(db: Database) -> None:
+    """Apply schema migrations idempotently for existing user DBs."""
+    cols = {row["name"] for row in db.fetchall("PRAGMA table_info(envelopes)")}
+    if "archived" not in cols:
+        db._conn.execute("ALTER TABLE envelopes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+        db._conn.commit()

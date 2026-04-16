@@ -2,18 +2,33 @@ from datetime import date
 from envel_mcp.database import Database
 
 
+def _check_envelope_active(db: Database, envelope_id: int | None) -> None:
+    if envelope_id is None:
+        return
+    env = db.fetchone("SELECT name, archived FROM envelopes WHERE id = ?", (envelope_id,))
+    if not env:
+        raise ValueError(f"Envelope id={envelope_id} not found")
+    if env["archived"]:
+        raise ValueError(f"Envelope '{env['name']}' is archived. Unarchive it first to record transactions.")
+
+
 def add_transaction(
     db: Database,
     amount: float,
     type: str,
     account_id: int,
+    memo: str,
     envelope_id: int | None = None,
     to_account_id: int | None = None,
     payee: str | None = None,
-    memo: str | None = None,
     transaction_date: str | None = None,
 ) -> dict:
+    if type in ("income", "expense") and envelope_id is None:
+        raise ValueError(f"envelope_id is required for {type} transactions")
+    if type == "transfer" and to_account_id is None:
+        raise ValueError("to_account_id is required for transfer transactions")
     txn_date = transaction_date or date.today().isoformat()
+    _check_envelope_active(db, envelope_id)
 
     txn_id = db.execute(
         """INSERT INTO transactions
@@ -87,6 +102,8 @@ def edit_transaction(
     new_account_id = account_id if account_id is not None else old["account_id"]
     new_to_account_id = to_account_id if to_account_id is not None else old["to_account_id"]
     new_envelope_id = envelope_id if envelope_id is not None else old["envelope_id"]
+    if envelope_id is not None and envelope_id != old["envelope_id"]:
+        _check_envelope_active(db, envelope_id)
     new_payee = payee if payee is not None else old["payee"]
     new_memo = memo if memo is not None else old["memo"]
     new_date = transaction_date or old["date"]
@@ -193,21 +210,24 @@ async def _add_transaction_mcp(
     amount: float,
     type: str,
     account_id: int,
+    memo: str,
     envelope_id: int | None = None,
     to_account_id: int | None = None,
     payee: str | None = None,
-    memo: str | None = None,
     transaction_date: str | None = None,
     ctx: Context = CurrentContext(),
 ) -> dict:
     """
     Record a new transaction.
     type: income | expense | transfer.
+    memo is always required.
+    envelope_id is required for income/expense, not needed for transfer.
+    to_account_id is required for transfer.
     transaction_date format YYYY-MM-DD (defaults to today).
     """
-    await ctx.info(f"add_transaction: {type} {amount} payee={payee}")
+    await ctx.info(f"add_transaction: {type} {amount} envelope={envelope_id} payee={payee}")
     with get_user_db() as db:
-        return add_transaction(db, amount, type, account_id, envelope_id, to_account_id, payee, memo, transaction_date)
+        return add_transaction(db, amount, type, account_id, memo, envelope_id, to_account_id, payee, transaction_date)
 
 
 @mcp.tool(name="get_transactions")

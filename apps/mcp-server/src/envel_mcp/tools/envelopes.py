@@ -88,9 +88,93 @@ def delete_envelope(db: Database, id: int) -> dict:
     if not env:
         raise ValueError(f"Envelope id={id} not found")
 
+    tx_count = db.fetchone(
+        "SELECT COUNT(*) AS n FROM transactions WHERE envelope_id = ?", (id,)
+    )["n"]
+    sched_count = db.fetchone(
+        "SELECT COUNT(*) AS n FROM scheduled_transactions WHERE envelope_id = ?", (id,)
+    )["n"]
+
+    if tx_count > 0 or sched_count > 0:
+        raise ValueError(
+            f"Cannot delete envelope '{env['name']}' (id={id}): "
+            f"{tx_count} transactions and {sched_count} scheduled transactions still reference it. "
+            f"Options:\n"
+            f"  1. Move history to another envelope: "
+            f"reassign_transactions(from_envelope_id={id}, to_envelope_id=<target>), then retry delete.\n"
+            f"  2. Archive instead (hides from daily use, keeps history): archive_envelope({id})."
+        )
+
     db.execute("DELETE FROM budget_periods WHERE envelope_id = ?", (id,))
     db.execute("DELETE FROM envelopes WHERE id = ?", (id,))
     return {"deleted_id": id, "name": env["name"]}
+
+
+def archive_envelope(db: Database, id: int) -> dict:
+    env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (id,))
+    if not env:
+        raise ValueError(f"Envelope id={id} not found")
+    if env["archived"]:
+        return {"id": id, "name": env["name"], "archived": True, "already_archived": True}
+
+    db.execute("UPDATE envelopes SET archived = 1 WHERE id = ?", (id,))
+    db.execute(
+        "UPDATE scheduled_transactions SET is_active = 0 WHERE envelope_id = ? AND is_active = 1",
+        (id,),
+    )
+    return {"id": id, "name": env["name"], "archived": True}
+
+
+def unarchive_envelope(db: Database, id: int) -> dict:
+    env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (id,))
+    if not env:
+        raise ValueError(f"Envelope id={id} not found")
+    if not env["archived"]:
+        return {"id": id, "name": env["name"], "archived": False, "already_active": True}
+
+    db.execute("UPDATE envelopes SET archived = 0 WHERE id = ?", (id,))
+    return {"id": id, "name": env["name"], "archived": False}
+
+
+def reassign_transactions(db: Database, from_envelope_id: int, to_envelope_id: int) -> dict:
+    if from_envelope_id == to_envelope_id:
+        raise ValueError("from_envelope_id and to_envelope_id must be different")
+
+    src = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (from_envelope_id,))
+    dst = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (to_envelope_id,))
+    if not src:
+        raise ValueError(f"Source envelope id={from_envelope_id} not found")
+    if not dst:
+        raise ValueError(f"Target envelope id={to_envelope_id} not found")
+    if src["type"] != dst["type"]:
+        raise ValueError(
+            f"Cannot reassign across types: source is '{src['type']}', target is '{dst['type']}'"
+        )
+    if dst["archived"]:
+        raise ValueError(f"Target envelope '{dst['name']}' is archived. Unarchive it first.")
+
+    tx_count = db.fetchone(
+        "SELECT COUNT(*) AS n FROM transactions WHERE envelope_id = ?", (from_envelope_id,)
+    )["n"]
+    sched_count = db.fetchone(
+        "SELECT COUNT(*) AS n FROM scheduled_transactions WHERE envelope_id = ?", (from_envelope_id,)
+    )["n"]
+
+    db.execute(
+        "UPDATE transactions SET envelope_id = ? WHERE envelope_id = ?",
+        (to_envelope_id, from_envelope_id),
+    )
+    db.execute(
+        "UPDATE scheduled_transactions SET envelope_id = ? WHERE envelope_id = ?",
+        (to_envelope_id, from_envelope_id),
+    )
+
+    return {
+        "from": {"id": from_envelope_id, "name": src["name"]},
+        "to": {"id": to_envelope_id, "name": dst["name"]},
+        "transactions_moved": tx_count,
+        "scheduled_moved": sched_count,
+    }
 
 
 def set_target(
@@ -131,6 +215,8 @@ def assign_to_envelope(db: Database, envelope_id: int, amount: float, period: st
         raise ValueError(f"Envelope id={envelope_id} not found")
     if env["type"] != "expense":
         raise ValueError("Only expense envelopes can be assigned")
+    if env["archived"]:
+        raise ValueError(f"Envelope '{env['name']}' is archived. Unarchive it first to assign money.")
 
     existing = db.fetchone(
         "SELECT id, carryover FROM budget_periods WHERE envelope_id = ? AND period = ?",
@@ -165,6 +251,8 @@ def move_money(db: Database, from_id: int, to_id: int, amount: float, period: st
     to_env = db.fetchone("SELECT * FROM envelopes WHERE id = ?", (to_id,))
     if not from_env or not to_env:
         raise ValueError("Envelope not found")
+    if to_env["archived"]:
+        raise ValueError(f"Cannot move money to archived envelope '{to_env['name']}'. Unarchive it first.")
 
     from_bp = db.fetchone(
         "SELECT id, assigned, carryover FROM budget_periods WHERE envelope_id = ? AND period = ?",
@@ -220,19 +308,22 @@ def move_money(db: Database, from_id: int, to_id: int, amount: float, period: st
     }
 
 
-def get_envelopes(db: Database, period: str | None = None) -> dict:
+def get_envelopes(db: Database, period: str | None = None, include_archived: bool = False) -> dict:
     period = period or _current_period()
 
+    archived_clause = "" if include_archived else " AND archived = 0"
+    archived_clause_e = "" if include_archived else " AND e.archived = 0"
+
     income_sources = db.fetchall(
-        "SELECT id, name, icon FROM envelopes WHERE type = 'income' ORDER BY id"
+        f"SELECT id, name, icon, archived FROM envelopes WHERE type = 'income'{archived_clause} ORDER BY id"
     )
 
     expense_envelopes = db.fetchall(
-        """SELECT e.id, e.name, e.icon, e.target_type, e.target_amount, e.target_deadline,
+        f"""SELECT e.id, e.name, e.icon, e.archived, e.target_type, e.target_amount, e.target_deadline,
                   g.name AS group_name, g.id AS group_id
            FROM envelopes e
            LEFT JOIN envelope_groups g ON e.group_id = g.id
-           WHERE e.type = 'expense'
+           WHERE e.type = 'expense'{archived_clause_e}
            ORDER BY COALESCE(g.sort_order, 999), e.id""",
     )
 
@@ -273,6 +364,7 @@ def get_envelopes(db: Database, period: str | None = None) -> dict:
             "id": env["id"],
             "name": env["name"],
             "icon": env["icon"],
+            "archived": bool(env["archived"]),
             "carryover": carryover,
             "assigned": assigned,
             "activity": act,
@@ -321,16 +413,17 @@ async def _add_group_mcp(name: str, sort_order: int = 0, ctx: Context = CurrentC
 
 
 @mcp.tool(name="get_envelopes")
-async def _get_envelopes_mcp(period: str | None = None, ctx: Context = CurrentContext()) -> dict:
+async def _get_envelopes_mcp(period: str | None = None, include_archived: bool = False, ctx: Context = CurrentContext()) -> dict:
     """
     List all envelopes.
     Income sources: reference for recording income.
     Expense envelopes per group: carryover, assigned, activity, available, target.
     period format YYYY-MM (defaults to current month).
+    Archived envelopes are hidden by default; pass include_archived=True to see them.
     """
-    await ctx.info(f"get_envelopes: period={period}")
+    await ctx.info(f"get_envelopes: period={period}, include_archived={include_archived}")
     with get_user_db() as db:
-        return get_envelopes(db, period)
+        return get_envelopes(db, period, include_archived)
 
 
 @mcp.tool(name="add_envelope")
@@ -360,10 +453,46 @@ async def _edit_envelope_mcp(
 
 @mcp.tool(name="delete_envelope")
 async def _delete_envelope_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
-    """Delete an envelope and all its budget data."""
+    """
+    Delete an envelope and its budget data.
+    Refuses if any transactions or scheduled transactions still reference the envelope.
+    In that case, either reassign_transactions to another envelope first, or archive_envelope instead.
+    """
     await ctx.info(f"delete_envelope: id={id}")
     with get_user_db() as db:
         return delete_envelope(db, id)
+
+
+@mcp.tool(name="archive_envelope")
+async def _archive_envelope_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
+    """
+    Archive an envelope. It stays in the database (history preserved) but is hidden
+    from default listings, cannot receive assignments or transfers, and any active
+    scheduled transactions referencing it are deactivated.
+    """
+    await ctx.info(f"archive_envelope: id={id}")
+    with get_user_db() as db:
+        return archive_envelope(db, id)
+
+
+@mcp.tool(name="unarchive_envelope")
+async def _unarchive_envelope_mcp(id: int, ctx: Context = CurrentContext()) -> dict:
+    """Unarchive an envelope so it appears in default listings and can be assigned again."""
+    await ctx.info(f"unarchive_envelope: id={id}")
+    with get_user_db() as db:
+        return unarchive_envelope(db, id)
+
+
+@mcp.tool(name="reassign_transactions")
+async def _reassign_transactions_mcp(from_envelope_id: int, to_envelope_id: int, ctx: Context = CurrentContext()) -> dict:
+    """
+    Bulk-move all transactions and scheduled transactions from one envelope to another.
+    Both envelopes must be the same type (income or expense). Target must not be archived.
+    Useful before delete_envelope when the source envelope still has history.
+    """
+    await ctx.info(f"reassign_transactions: from={from_envelope_id} to={to_envelope_id}")
+    with get_user_db() as db:
+        return reassign_transactions(db, from_envelope_id, to_envelope_id)
 
 
 @mcp.tool(name="set_target")

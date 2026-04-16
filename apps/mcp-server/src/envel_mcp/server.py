@@ -75,6 +75,7 @@ class TestTokenVerifier(TokenVerifier):
     """Static single-token verifier for local development / evaluation."""
 
     def __init__(self, token: str):
+        super().__init__()
         self._token = token
 
     async def verify_token(self, token: str) -> AccessToken | None:
