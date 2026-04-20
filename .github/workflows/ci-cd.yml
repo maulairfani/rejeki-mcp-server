@@ -43,6 +43,9 @@ jobs:
           pip install -e apps/auth-server
           pip install -e apps/platform/server
       - name: Import smoke test
+        env:
+          USERS_DB: /tmp/ci-users.db
+          SESSION_SECRET: ci-dummy-session-secret-for-import-smoke-test
         run: |
           python -c "import envel_mcp.server"
           python -c "import envel_auth.server"
