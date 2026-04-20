@@ -56,12 +56,20 @@ journalctl -u envel-mcp -f
 
 ## Architecture
 
+### URL Structure (Production)
+
+- `envel.dev` — marketing site (React + Vite, `apps/marketing/`)
+- `envel.dev/mcp` — MCP server (port 8001)
+- `envel.dev/auth` — Auth server (port 9004)
+- `platform.envel.dev` — Platform dashboard (port 8002 backend + Vite frontend)
+
 ### Request Flow
 
 ```text
-MCP client → Nginx → /envel/mcp/  → MCP Server  (port 8001)
-                   → /envel/auth/ → Auth Server (port 9004)
-Browser    → Nginx → /              → Platform    (port 8002)
+MCP client → Nginx → envel.dev/mcp  → MCP Server   (port 8001)
+                   → envel.dev/auth → Auth Server  (port 9004)
+Browser    → Nginx → envel.dev      → Marketing    (static)
+                   → platform.envel.dev → Platform (port 8002)
 ```
 
 ### Per-User Database Isolation

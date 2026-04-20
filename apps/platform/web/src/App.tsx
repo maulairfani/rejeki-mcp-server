@@ -12,6 +12,9 @@ import { AccountsPage } from "@/pages/AccountsPage"
 import { WishlistPage } from "@/pages/WishlistPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { LoginPage } from "@/pages/LoginPage"
+import { SignupPage } from "@/pages/SignupPage"
+import { SignupConfirmPage } from "@/pages/SignupConfirmPage"
+import { ConnectPage } from "@/pages/ConnectPage"
 
 export default function App() {
   const { authenticated, loading } = useAuth()
@@ -28,6 +31,8 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/signup/confirm" element={<SignupConfirmPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     )
@@ -35,12 +40,17 @@ export default function App() {
 
   return (
     <ShowNominalProvider>
-      <AuthenticatedApp />
+      <Routes>
+        {/* Chromeless authenticated routes */}
+        <Route path="/connect" element={<ConnectPage />} />
+        {/* Chromed routes (sidebar + main) */}
+        <Route path="/*" element={<ChromedApp />} />
+      </Routes>
     </ShowNominalProvider>
   )
 }
 
-function AuthenticatedApp() {
+function ChromedApp() {
   const { theme, setTheme } = useTheme()
   const { showNominal } = useShowNominal()
 

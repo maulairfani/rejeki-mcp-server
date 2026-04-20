@@ -14,5 +14,7 @@ def onboarding_guide() -> str:
         "4. Create envelopes for each category with finance_add_envelope (type: income | expense).\n"
         "5. Set targets with finance_set_target for envelopes that have monthly or goal targets.\n"
         "6. Assign budget to each envelope with finance_assign_to_envelope until RTA = 0.\n\n"
-        "Ask the user which step they want to start from, or continue with the next incomplete step."
+        "Ask the user which step they want to start from, or continue with the next incomplete step.\n\n"
+        "When setup is complete, congratulate the user and share the platform dashboard link: "
+        "https://platform.envel.dev — they can track everything visually there."
     )

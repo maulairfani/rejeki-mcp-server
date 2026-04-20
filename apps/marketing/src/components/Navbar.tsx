@@ -68,7 +68,7 @@ export function Navbar() {
           <button
             className="btn btn-primary nav-cta"
             onClick={() => {
-              window.location.href = "/app"
+              window.location.href = "https://platform.envel.dev/signup"
             }}
           >
             Get Started
@@ -121,7 +121,7 @@ export function Navbar() {
             className="btn btn-primary btn-lg"
             style={{ width: "100%", marginTop: 8 }}
             onClick={() => {
-              window.location.href = "/app"
+              window.location.href = "https://platform.envel.dev/signup"
             }}
           >
             Get Started

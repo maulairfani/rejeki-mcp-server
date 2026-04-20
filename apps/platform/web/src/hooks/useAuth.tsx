@@ -13,8 +13,24 @@ interface AuthState {
   loading: boolean
 }
 
+export interface SignupInput {
+  name: string
+  email: string
+  username: string
+  password: string
+}
+
+export interface SignupResult {
+  ok: boolean
+  error?: string
+  field?: string
+  code?: string
+}
+
 interface AuthContextValue extends AuthState {
   login: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>
+  signup: (input: SignupInput) => Promise<SignupResult>
+  markAuthenticated: (username: string) => void
   logout: () => Promise<void>
 }
 
@@ -113,6 +129,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   )
 
+  const signup = useCallback(async (input: SignupInput): Promise<SignupResult> => {
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(input),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setState({ authenticated: true, username: data.username, loading: false })
+        return { ok: true }
+      }
+      const err = await res.json().catch(() => null)
+      return {
+        ok: false,
+        error: err?.detail ?? "Signup failed",
+        field: err?.field,
+        code: err?.code,
+      }
+    } catch {
+      return { ok: false, error: "Cannot connect to server" }
+    }
+  }, [])
+
+  const markAuthenticated = useCallback((username: string) => {
+    setState({ authenticated: true, username, loading: false })
+  }, [])
+
   const logout = useCallback(async () => {
     if (MOCK_MODE) {
       localStorage.removeItem("envel-mock-user")
@@ -128,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
+    <AuthContext.Provider value={{ ...state, login, signup, markAuthenticated, logout }}>
       {children}
     </AuthContext.Provider>
   )

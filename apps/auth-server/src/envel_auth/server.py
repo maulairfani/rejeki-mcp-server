@@ -47,12 +47,14 @@ USERS_DB = os.environ.get("USERS_DB")
 if not USERS_DB:
     raise RuntimeError("USERS_DB env var must be set to the path of users.db")
 PLATFORM_SERVICE_SECRET = os.environ.get("PLATFORM_SERVICE_SECRET", "")
-AS_BASE_URL = os.environ.get("AS_BASE_URL", "https://maulairfani.my.id/envel/auth")
+AS_BASE_URL = os.environ.get("AS_BASE_URL", "https://envel.dev/auth")
+PLATFORM_URL = os.environ.get("PLATFORM_URL", "https://platform.envel.dev")
 MCP_SCOPE = "envel"
 
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = f"{AS_BASE_URL}/google/callback"
+PLATFORM_GOOGLE_REDIRECT_URI = f"{AS_BASE_URL}/platform/google/callback"
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
@@ -60,11 +62,20 @@ GOOGLE_SCOPES = "openid email profile https://www.googleapis.com/auth/drive.file
 
 CREATE_USERS_TABLE = """
 CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    password_hash TEXT NOT NULL,
-    db_path TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    username             TEXT PRIMARY KEY,
+    name                 TEXT,
+    email                TEXT COLLATE NOCASE,
+    password_hash        TEXT,
+    db_path              TEXT NOT NULL,
+    google_sub           TEXT,
+    google_email         TEXT,
+    google_refresh_token TEXT,
+    created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+    first_connected_at   TEXT,
+    last_active_at       TEXT
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email      ON users(email)      WHERE email      IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL;
 """
 
 CREATE_AUTH_TABLES = """
@@ -89,7 +100,7 @@ TOKEN_TTL = 3600 * 24 * 30  # 30 days
 def _get_users_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(USERS_DB)
     conn.row_factory = sqlite3.Row
-    conn.execute(CREATE_USERS_TABLE)
+    conn.executescript(CREATE_USERS_TABLE)
     conn.executescript(CREATE_AUTH_TABLES)
     _migrate(conn)
     return conn
@@ -98,15 +109,29 @@ def _get_users_conn() -> sqlite3.Connection:
 def _migrate(conn: sqlite3.Connection) -> None:
     """Auto-apply schema changes. Safe to run repeatedly."""
     for col, definition in [
+        ("name",                 "TEXT"),
+        ("email",                "TEXT COLLATE NOCASE"),
         ("google_sub",           "TEXT"),
         ("google_email",         "TEXT"),
         ("google_refresh_token", "TEXT"),
+        ("first_connected_at",   "TEXT"),
+        ("last_active_at",       "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
             conn.commit()
         except sqlite3.OperationalError:
             pass  # column already exists
+    # Also ensure partial unique indexes exist on migrated tables
+    for stmt in [
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email      ON users(email)      WHERE email      IS NOT NULL",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL",
+    ]:
+        try:
+            conn.execute(stmt)
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
 
 def _get_user(username: str) -> dict | None:
@@ -116,6 +141,82 @@ def _get_user(username: str) -> dict | None:
             (username,),
         ).fetchone()
     return dict(row) if row else None
+
+
+_USERNAME_SAFE_RE = __import__("re").compile(r"[^a-zA-Z0-9_-]")
+
+
+def _suggest_username(email: str) -> str:
+    """Generate a unique username from an email address.
+
+    Strips the local-part of the email, removes disallowed chars, trims to 32 chars,
+    and appends a counter if the candidate is taken. Returns a string that is
+    guaranteed to be available in users.db at call time.
+    """
+    local = (email or "").split("@", 1)[0].lower()
+    candidate = _USERNAME_SAFE_RE.sub("", local)[:32]
+    if len(candidate) < 3:
+        candidate = "user"
+    base = candidate
+    with _get_users_conn() as conn:
+        i = 1
+        while True:
+            row = conn.execute(
+                "SELECT 1 FROM users WHERE username = ? LIMIT 1", (candidate,)
+            ).fetchone()
+            if row is None:
+                return candidate
+            i += 1
+            candidate = f"{base}{i}"[:32]
+
+
+def _default_user_db_path(username: str) -> str:
+    """Mirror scripts/add_user.py: <project_root>/users/<username>.db"""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[4]  # apps/auth-server/src/envel_auth/server.py → up 4 to project root
+    return str(root / "users" / f"{username}.db")
+
+
+def _init_user_db_file(db_path: str, username: str) -> None:
+    """Create the user's per-user SQLite DB file, encrypted if DB_ENCRYPTION_KEY set."""
+    from pathlib import Path
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    master = os.environ.get("DB_ENCRYPTION_KEY")
+    if master:
+        try:
+            import hashlib
+            import hmac
+            import sqlcipher3  # type: ignore[import-not-found]
+            key = hmac.new(master.encode(), username.encode(), hashlib.sha256).hexdigest()
+            conn = sqlcipher3.connect(db_path)
+            conn.execute(f"PRAGMA key = '{key}'")
+            conn.close()
+            return
+        except ImportError:
+            logger.warning("sqlcipher_missing", extra={"username": username})
+    conn = sqlite3.connect(db_path)
+    conn.close()
+
+
+def _create_google_user(
+    username: str,
+    name: str,
+    email: str,
+    google_sub: str,
+    refresh_token: str | None,
+) -> str:
+    """Create a new user record for a Google-authenticated signup. Returns the username."""
+    db_path = _default_user_db_path(username)
+    with _get_users_conn() as conn:
+        conn.execute(
+            """INSERT INTO users (username, name, email, db_path, google_sub, google_email, google_refresh_token)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (username, name, email, db_path, google_sub, email, refresh_token or None),
+        )
+        conn.commit()
+    _init_user_db_file(db_path, username)
+    logger.info("google_signup_success", extra={"username": username, "email": email})
+    return username
 
 
 # ─── OAUTH PROVIDER ──────────────────────────────────────────────────────────
@@ -128,10 +229,16 @@ class EnvelOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Ref
         # Short-lived state — in-memory only (minutes lifetime, no need to persist)
         self.auth_codes: dict[str, AuthorizationCode] = {}
         self.state_mapping: dict[str, dict[str, Any]] = {}
-        # Google OAuth: maps google_state → mcp_state
+        # Google OAuth (MCP flow): maps google_state → mcp_state
         self.google_state_mapping: dict[str, str] = {}
         # Pending account links: maps link_token → google user info + mcp_state
         self.pending_links: dict[str, dict[str, Any]] = {}
+        # Platform Google OAuth state: maps google_state → {intent}
+        self.platform_google_state: dict[str, dict[str, Any]] = {}
+        # Pending platform Google signups: handoff_token → {google_sub, google_email, google_name, refresh_token, suggested_username, expires_at}
+        self.pending_platform_signups: dict[str, dict[str, Any]] = {}
+        # Pending platform Google logins: handoff_token → {username, expires_at}
+        self.pending_platform_logins: dict[str, dict[str, Any]] = {}
 
     def _check_credentials(self, username: str, password: str) -> bool:
         user = _get_user(username)
@@ -368,6 +475,221 @@ class EnvelOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Ref
         del self.pending_links[link_token]
         logger.info("google_account_linked", extra={"username": username, "google_email": pending["google_email"]})
         return self._complete_mcp_flow(pending["mcp_state"], username)
+
+    # ── Platform Google OAuth flow (signup/login via platform.envel.dev) ──
+
+    async def handle_platform_google_authorize(self, request: Request) -> Response:
+        """Start Google OAuth for platform signup/login (separate from MCP flow)."""
+        if not GOOGLE_CLIENT_ID:
+            raise HTTPException(503, "Google OAuth is not configured")
+        intent = request.query_params.get("intent", "signup")
+        if intent not in ("signup", "login"):
+            intent = "signup"
+
+        google_state = secrets.token_hex(16)
+        self.platform_google_state[google_state] = {
+            "intent": intent,
+            "created_at": time.time(),
+        }
+
+        import urllib.parse
+        params = urllib.parse.urlencode({
+            "client_id": GOOGLE_CLIENT_ID,
+            "redirect_uri": PLATFORM_GOOGLE_REDIRECT_URI,
+            "response_type": "code",
+            "scope": GOOGLE_SCOPES,
+            "access_type": "offline",
+            "prompt": "select_account",
+            "state": google_state,
+        })
+        return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{params}", status_code=302)
+
+    async def handle_platform_google_callback(self, request: Request) -> Response:
+        """Google redirects here after user consents in the platform signup/login flow."""
+        import httpx
+
+        code = request.query_params.get("code")
+        google_state = request.query_params.get("state")
+        if not code or not google_state:
+            raise HTTPException(400, "Missing code or state")
+
+        meta = self.platform_google_state.pop(google_state, None)
+        if not meta:
+            raise HTTPException(400, "Expired or invalid state")
+
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(GOOGLE_TOKEN_URL, data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": PLATFORM_GOOGLE_REDIRECT_URI,
+                "grant_type": "authorization_code",
+            })
+            if token_resp.status_code != 200:
+                raise HTTPException(502, "Google token exchange failed")
+            token_data = token_resp.json()
+
+            userinfo_resp = await client.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {token_data['access_token']}"},
+            )
+            if userinfo_resp.status_code != 200:
+                raise HTTPException(502, "Google userinfo fetch failed")
+            userinfo = userinfo_resp.json()
+
+        google_sub = userinfo["sub"]
+        google_email = (userinfo.get("email") or "").lower()
+        google_name = userinfo.get("name") or google_email.split("@", 1)[0]
+        refresh_token = token_data.get("refresh_token", "")
+
+        # Look up existing user by google_sub or email
+        with _get_users_conn() as conn:
+            row = conn.execute(
+                "SELECT username FROM users WHERE google_sub = ? OR email = ? LIMIT 1",
+                (google_sub, google_email),
+            ).fetchone()
+
+        if row:
+            # Existing user — log them in. Also ensure google_sub and refresh_token are stored.
+            username = row["username"]
+            with _get_users_conn() as conn:
+                conn.execute(
+                    """UPDATE users SET
+                         google_sub = COALESCE(google_sub, ?),
+                         google_email = COALESCE(google_email, ?),
+                         google_refresh_token = COALESCE(?, google_refresh_token)
+                       WHERE username = ?""",
+                    (google_sub, google_email, refresh_token or None, username),
+                )
+                conn.commit()
+            handoff = f"gh_login_{secrets.token_hex(32)}"
+            self.pending_platform_logins[handoff] = {
+                "username": username,
+                "expires_at": time.time() + 300,
+            }
+            logger.info("platform_google_login", extra={"username": username})
+            return RedirectResponse(
+                url=f"{PLATFORM_URL}/api/auth/google-handoff?token={handoff}",
+                status_code=302,
+            )
+
+        # New Google user — stage a pending signup. Platform confirms username before creation.
+        suggested = _suggest_username(google_email)
+        handoff = f"gh_signup_{secrets.token_hex(32)}"
+        self.pending_platform_signups[handoff] = {
+            "google_sub": google_sub,
+            "google_email": google_email,
+            "google_name": google_name,
+            "refresh_token": refresh_token,
+            "suggested_username": suggested,
+            "expires_at": time.time() + 600,
+        }
+        logger.info("platform_google_pending_signup", extra={"email": google_email, "suggested": suggested})
+        return RedirectResponse(
+            url=f"{PLATFORM_URL}/api/auth/google-handoff?token={handoff}",
+            status_code=302,
+        )
+
+    def _check_service_secret(self, body: dict) -> None:
+        if not PLATFORM_SERVICE_SECRET:
+            raise HTTPException(503, "Service endpoint not configured")
+        if body.get("service_secret", "") != PLATFORM_SERVICE_SECRET:
+            raise HTTPException(403, "Forbidden")
+
+    async def handle_platform_handoff_resolve(self, request: Request) -> Response:
+        """Platform calls this to exchange a handoff token for user info.
+
+        For login handoffs: returns {type:'login', username}.
+        For signup handoffs: returns {type:'signup', google_email, google_name, suggested_username}.
+        The handoff token remains valid until TTL so platform can call signup-complete.
+        """
+        body = await request.json()
+        self._check_service_secret(body)
+        token = body.get("token", "")
+        now = time.time()
+
+        login = self.pending_platform_logins.get(token)
+        if login:
+            if login["expires_at"] < now:
+                self.pending_platform_logins.pop(token, None)
+                return JSONResponse({"error": "expired"}, status_code=410)
+            # Login handoffs are one-shot
+            self.pending_platform_logins.pop(token, None)
+            return JSONResponse({"type": "login", "username": login["username"]})
+
+        signup = self.pending_platform_signups.get(token)
+        if signup:
+            if signup["expires_at"] < now:
+                self.pending_platform_signups.pop(token, None)
+                return JSONResponse({"error": "expired"}, status_code=410)
+            return JSONResponse({
+                "type": "signup",
+                "google_email": signup["google_email"],
+                "google_name": signup["google_name"],
+                "suggested_username": signup["suggested_username"],
+            })
+
+        return JSONResponse({"error": "not_found"}, status_code=404)
+
+    async def handle_platform_signup_complete(self, request: Request) -> Response:
+        """Platform calls this with token + chosen username to create the user."""
+        body = await request.json()
+        self._check_service_secret(body)
+        token = body.get("token", "")
+        username = (body.get("username") or "").strip()
+
+        pending = self.pending_platform_signups.get(token)
+        if not pending:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        if pending["expires_at"] < time.time():
+            self.pending_platform_signups.pop(token, None)
+            return JSONResponse({"error": "expired"}, status_code=410)
+
+        import re as _re
+        if not _re.match(r"^[a-zA-Z0-9_-]{3,32}$", username):
+            return JSONResponse({"error": "invalid_username"}, status_code=400)
+
+        with _get_users_conn() as conn:
+            taken = conn.execute(
+                "SELECT 1 FROM users WHERE username = ? LIMIT 1", (username,)
+            ).fetchone()
+        if taken:
+            return JSONResponse({"error": "username_taken"}, status_code=409)
+
+        try:
+            _create_google_user(
+                username=username,
+                name=pending["google_name"],
+                email=pending["google_email"],
+                google_sub=pending["google_sub"],
+                refresh_token=pending["refresh_token"],
+            )
+        except sqlite3.IntegrityError as e:
+            logger.warning("google_signup_conflict", extra={"email": pending["google_email"], "err": str(e)})
+            return JSONResponse({"error": "conflict"}, status_code=409)
+
+        self.pending_platform_signups.pop(token, None)
+        return JSONResponse({"username": username})
+
+    async def handle_platform_connection_status(self, request: Request) -> Response:
+        """Platform calls this to check whether a user has ever used the MCP server."""
+        body = await request.json()
+        self._check_service_secret(body)
+        username = (body.get("username") or "").strip()
+        if not username:
+            return JSONResponse({"error": "missing_username"}, status_code=400)
+        with _get_users_conn() as conn:
+            row = conn.execute(
+                "SELECT first_connected_at, last_active_at FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+        if not row:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        return JSONResponse({
+            "username": username,
+            "first_connected_at": row["first_connected_at"],
+            "last_active_at": row["last_active_at"],
+        })
 
     def _complete_mcp_flow(self, mcp_state: str, username: str) -> Response:
         """Issue MCP auth code and redirect back to MCP client."""
@@ -697,7 +1019,15 @@ def make_introspect_handler(provider: EnvelOAuthProvider):
             row = conn.execute(
                 "SELECT username FROM oauth_tokens WHERE token = ?", (token,)
             ).fetchone()
-        username = row["username"] if row else "unknown"
+            username = row["username"] if row else "unknown"
+            conn.execute(
+                """UPDATE users
+                   SET last_active_at = datetime('now'),
+                       first_connected_at = COALESCE(first_connected_at, datetime('now'))
+                   WHERE username = ?""",
+                (username,),
+            )
+            conn.commit()
         user = _get_user(username)
         db_path = user["db_path"] if user else ""
 
@@ -788,6 +1118,31 @@ def create_app() -> Starlette:
         Route("/google/authorize", endpoint=provider.handle_google_authorize, methods=["GET"]),
         Route("/google/callback", endpoint=provider.handle_google_callback, methods=["GET"]),
         Route("/link/callback", endpoint=provider.handle_link_callback, methods=["POST"]),
+        Route(
+            "/platform/google/authorize",
+            endpoint=provider.handle_platform_google_authorize,
+            methods=["GET"],
+        ),
+        Route(
+            "/platform/google/callback",
+            endpoint=provider.handle_platform_google_callback,
+            methods=["GET"],
+        ),
+        Route(
+            "/platform/handoff/resolve",
+            endpoint=provider.handle_platform_handoff_resolve,
+            methods=["POST"],
+        ),
+        Route(
+            "/platform/signup/complete",
+            endpoint=provider.handle_platform_signup_complete,
+            methods=["POST"],
+        ),
+        Route(
+            "/platform/user/connection-status",
+            endpoint=provider.handle_platform_connection_status,
+            methods=["POST"],
+        ),
         Route(
             "/introspect",
             endpoint=cors_middleware(make_introspect_handler(provider), ["POST", "OPTIONS"]),

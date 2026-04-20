@@ -55,12 +55,15 @@ if not _SESSION_SECRET and not os.environ.get("TEST_TOKEN"):
 app = FastAPI(title="Envel Platform API", lifespan=_lifespan)
 
 _secure_cookies = os.environ.get("SECURE_COOKIES", "").lower() == "true"
-app.add_middleware(
-    SessionMiddleware,
+_session_domain = os.environ.get("SESSION_COOKIE_DOMAIN") or None  # e.g. ".envel.dev" in prod
+_session_kwargs: dict = dict(
     secret_key=_SESSION_SECRET or "dev-secret-test-only",
     https_only=_secure_cookies,
     same_site="lax",
 )
+if _session_domain:
+    _session_kwargs["domain"] = _session_domain
+app.add_middleware(SessionMiddleware, **_session_kwargs)
 
 _allowed_origins = os.environ.get(
     "CORS_ORIGINS", "http://localhost:5173"

@@ -19,11 +19,18 @@ USERS_DB = Path(__file__).parent.parent / "users.db"
 
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    password_hash TEXT NOT NULL,
-    db_path TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    username      TEXT PRIMARY KEY,
+    name          TEXT,
+    email         TEXT COLLATE NOCASE,
+    password_hash TEXT,
+    db_path       TEXT NOT NULL,
+    google_sub    TEXT,
+    google_email  TEXT,
+    google_refresh_token TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email      ON users(email)      WHERE email      IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL;
 """
 
 
@@ -51,6 +58,8 @@ def main():
     parser = argparse.ArgumentParser(description="Add or update a user in users.db")
     parser.add_argument("username", help="Username")
     parser.add_argument("password", help="Password (will be hashed with bcrypt)")
+    parser.add_argument("--name", default=None, help="Display name (defaults to username)")
+    parser.add_argument("--email", default=None, help="Email address (optional)")
     parser.add_argument(
         "--db-path",
         default=None,
@@ -71,11 +80,12 @@ def main():
     db_path = args.db_path or str(Path(__file__).parent.parent / "users" / f"{args.username}.db")
     users_db = Path(args.users_db)
     encryption_key = args.encryption_key or os.environ.get("DB_ENCRYPTION_KEY")
+    name = args.name or args.username
 
     password_hash = bcrypt.hashpw(args.password.encode(), bcrypt.gensalt()).decode()
 
     conn = sqlite3.connect(str(users_db))
-    conn.execute(CREATE_TABLE)
+    conn.executescript(CREATE_TABLE)
 
     existing = conn.execute(
         "SELECT username FROM users WHERE username = ?", (args.username,)
@@ -84,13 +94,13 @@ def main():
     if existing:
         print(f"User '{args.username}' already exists. Updating...")
         conn.execute(
-            "UPDATE users SET password_hash = ?, db_path = ? WHERE username = ?",
-            (password_hash, db_path, args.username),
+            "UPDATE users SET name = ?, email = ?, password_hash = ?, db_path = ? WHERE username = ?",
+            (name, args.email, password_hash, db_path, args.username),
         )
     else:
         conn.execute(
-            "INSERT INTO users (username, password_hash, db_path) VALUES (?, ?, ?)",
-            (args.username, password_hash, db_path),
+            "INSERT INTO users (username, name, email, password_hash, db_path) VALUES (?, ?, ?, ?, ?)",
+            (args.username, name, args.email, password_hash, db_path),
         )
 
     conn.commit()

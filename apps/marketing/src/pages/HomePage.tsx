@@ -87,7 +87,7 @@ export function HomePage() {
                 <button
                   className="btn btn-primary btn-lg"
                   onClick={() => {
-                    window.location.href = "/app"
+                    window.location.href = "https://platform.envel.dev/signup"
                   }}
                 >
                   Start for Free
@@ -299,7 +299,7 @@ export function HomePage() {
               className="btn btn-primary btn-lg"
               style={{ marginTop: 8 }}
               onClick={() => {
-                window.location.href = "/app"
+                window.location.href = "https://platform.envel.dev/signup"
               }}
             >
               Start for Free
