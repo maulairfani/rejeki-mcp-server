@@ -1,0 +1,79 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-frontend:
+    name: Build frontends
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [apps/platform/web, apps/marketing]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.app }}
+      - run: npm run build
+        working-directory: ${{ matrix.app }}
+
+  check-python:
+    name: Check Python apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Install apps
+        run: |
+          pip install -e apps/mcp-server
+          pip install -e apps/auth-server
+          pip install -e apps/platform/server
+      - name: Import smoke test
+        run: |
+          python -c "import envel_mcp.server"
+          python -c "import envel_auth.server"
+          python -c "import envel_platform.server"
+
+  deploy:
+    name: Deploy to VPS
+    needs: [build-frontend, check-python]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H envel.dev >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Deploy
+        run: |
+          ssh -i ~/.ssh/deploy irfani@envel.dev 'bash -s' <<'EOF'
+            set -euo pipefail
+            cd /opt/envel-mcp
+            git fetch --prune origin main
+            git reset --hard origin/main
+            (cd apps/platform/web && npm ci && npm run build)
+            (cd apps/marketing && npm ci && npm run build)
+            sudo cp -r apps/marketing/dist/. /var/www/html/
+            sudo systemctl restart envel-auth envel-mcp envel-platform
+            sleep 2
+            sudo systemctl is-active envel-auth envel-mcp envel-platform
+          EOF
