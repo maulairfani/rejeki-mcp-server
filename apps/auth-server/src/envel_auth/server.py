@@ -74,8 +74,6 @@ CREATE TABLE IF NOT EXISTS users (
     first_connected_at   TEXT,
     last_active_at       TEXT
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email      ON users(email)      WHERE email      IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL;
 """
 
 CREATE_AUTH_TABLES = """

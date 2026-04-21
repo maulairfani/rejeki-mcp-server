@@ -21,6 +21,11 @@ def _auth_server_url() -> str:
     return os.environ.get("AUTH_SERVER_URL", "http://localhost:9004")
 
 
+def _auth_public_url() -> str:
+    """Browser-visible URL of the auth server (for redirects)."""
+    return os.environ.get("AS_BASE_URL", _auth_server_url())
+
+
 def _service_secret() -> str:
     return os.environ.get("PLATFORM_SERVICE_SECRET", "")
 
@@ -76,7 +81,7 @@ async def google_start(intent: str = "signup"):
     if intent not in ("signup", "login"):
         intent = "signup"
     return RedirectResponse(
-        url=f"{_auth_server_url()}/platform/google/authorize?intent={intent}",
+        url=f"{_auth_public_url()}/platform/google/authorize?intent={intent}",
         status_code=302,
     )
 
