@@ -91,36 +91,3 @@ CREATE TABLE IF NOT EXISTS user_memory (
 );
 INSERT OR IGNORE INTO user_memory (id, content) VALUES (1, '');
 
--- Default envelope groups
-INSERT OR IGNORE INTO envelope_groups (id, name, sort_order) VALUES
-    (1, 'Fixed Expenses',    1),
-    (2, 'Daily Essentials',  2),
-    (3, 'Personal Spending', 3),
-    (4, 'Savings & Goals',   4),
-    (5, 'Unexpected',        5);
-
--- Default envelopes
-INSERT OR IGNORE INTO envelopes (id, name, icon, type, group_id) VALUES
-    -- Income sources (no group)
-    (1,  'Salary',           '💼', 'income',  NULL),
-    (2,  'Freelance',        '💻', 'income',  NULL),
-    (3,  'Investments',      '📈', 'income',  NULL),
-    (4,  'Other Income',     '💰', 'income',  NULL),
-    -- Fixed Expenses
-    (5,  'Rent',             '🏡', 'expense', 1),
-    (6,  'Bills',            '📄', 'expense', 1),
-    (7,  'Subscriptions',    '🔄', 'expense', 1),
-    (8,  'Family Support',   '🏠', 'expense', 1),
-    -- Daily Essentials
-    (9,  'Food',             '🍽️', 'expense', 2),
-    (10, 'Transport',        '🚗', 'expense', 2),
-    -- Personal Spending
-    (11, 'Shopping',         '🛍️', 'expense', 3),
-    (12, 'Entertainment',    '🎮', 'expense', 3),
-    (13, 'Health',           '🏥', 'expense', 3),
-    (14, 'Education',        '📚', 'expense', 3),
-    -- Savings & Goals
-    (15, 'Emergency Fund',   '🛡️', 'expense', 4),
-    (16, 'Savings',          '💎', 'expense', 4),
-    -- Unexpected
-    (17, 'Miscellaneous',    '💸', 'expense', 5);
