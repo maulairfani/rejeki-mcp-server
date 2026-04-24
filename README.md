@@ -1,8 +1,40 @@
-# Finance MCP Server
+# Envel MCP
 
-AI-powered personal finance agent built with the MCP SDK and SQLite. Implements envelope budgeting — every rupiah has a job.
+> AI-powered envelope budgeting — every rupiah has a job.
 
-Designed to be used with **any MCP client** (Claude, Cursor, etc.) as an MCP integration.
+An MCP (Model Context Protocol) server that brings personal finance management into any MCP-compatible AI client (Claude, Cursor, etc.). Built on [FastMCP](https://github.com/jlowin/fastmcp) with per-user SQLite isolation and OAuth 2.1 authentication.
+
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](#license)
+
+---
+
+## Features
+
+- **Envelope budgeting** — assign every rupiah to a category before you spend it
+- **Multi-account tracking** — bank accounts, e-wallets, and cash in one place
+- **Scheduled transactions** — recurring income and expenses handled automatically
+- **Budget analytics** — ready-to-assign balance, age of money, monthly summaries
+- **Wishlist** — track items you're saving toward
+- **Platform dashboard** — React web UI for visual budget management
+- **Per-user isolation** — each user gets their own SQLite database
+- **Any MCP client** — works with Claude, Cursor, or any MCP-compatible client
+
+---
+
+## Repository Structure
+
+```
+apps/
+├── mcp-server/       FastMCP server — tools & prompts (port 8001)
+├── auth-server/      OAuth 2.1 authentication server (port 9004)
+├── platform/
+│   ├── server/       FastAPI REST API backend (port 8002)
+│   └── web/          React + TypeScript frontend (Vite, Shadcn/ui)
+└── marketing/        Marketing site (React + Vite)
+scripts/
+└── add_user.py       User management CLI
+```
 
 ---
 
@@ -13,122 +45,140 @@ MCP Client (Claude, Cursor, etc.)
    │
    ▼ HTTPS
 Nginx (reverse proxy)
-   ├── /envel/mcp/   → MCP Server  (port 8001)
-   └── /envel/auth/  → Auth Server (port 9004)
+   ├── /mcp/    → MCP Server   (port 8001)
+   └── /auth/   → Auth Server  (port 9004)
+
+Browser
+   ├── envel.dev           → Marketing site (static)
+   └── platform.envel.dev  → Platform dashboard (port 8002)
 ```
 
-Monorepo with three apps in the `apps/` folder:
-
-- **`apps/mcp-server/`** — FastMCP server; tools for transactions, envelopes, accounts
-- **`apps/auth-server/`** — OAuth 2.1 with login form backed by `users.json`
-- **`apps/platform/`** — Financial data visualization dashboard (port 8002)
+**Request flow:**
+1. MCP client sends a request with a bearer token.
+2. MCP server calls the auth server's `/introspect` endpoint to resolve the token → user DB path.
+3. All tools read/write to that user's isolated SQLite file.
 
 ---
 
-## Local Setup (Development)
+## Getting Started (Local Development)
 
-### 1. Clone & install dependencies
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+ (for the platform frontend)
+
+### 1. Clone and install
 
 ```bash
-git clone https://github.com/maulairfani/envel-mcp-server.git
-cd envel-mcp-server
+git clone https://github.com/maulairfani/envel-mcp.git
+cd envel-mcp
 pip install -e apps/mcp-server
 pip install -e apps/auth-server
-pip install -e apps/platform
+pip install -e apps/platform/server
 ```
 
-### 2. Create `.env` file
+### 2. Configure environment
 
-```bash
-cp .env.example .env
-```
-
-For local development, just set these two variables in `.env`:
+Create a `.env` file in the project root. For local development, two variables are enough — no auth server required:
 
 ```env
 TEST_TOKEN=any-secret-token
 TEST_DB=./users/test.db
 ```
 
-### 3. Run servers
+### 3. Start the servers
 
 ```bash
-# MCP server (port 8001)
+# MCP server — http://localhost:8001
 envel
 
-# Auth server (port 9004) — optional for dev, just use TEST_TOKEN
+# Auth server — http://localhost:9004 (optional for dev)
 envel-auth
 
-# Platform dashboard (port 8002)
+# Platform API — http://localhost:8002
 envel-platform
 ```
 
-MCP server health check:
+Verify the MCP server is up:
 
 ```bash
 curl http://localhost:8001/health
 ```
 
-Platform dashboard: open `http://localhost:8002` in your browser, log in with credentials from `users.db`.
+### 4. Connect to your MCP client
 
-### 4. Connect to MCP client (local)
+Add to your MCP client config (e.g. `claude_desktop_config.json`):
 
-Use MCP Inspector or add to your MCP client config with `TEST_TOKEN`.
+```json
+{
+  "mcpServers": {
+    "envel": {
+      "url": "http://localhost:8001/mcp/",
+      "headers": {
+        "Authorization": "Bearer any-secret-token"
+      }
+    }
+  }
+}
+```
+
+Or use [MCP Inspector](https://github.com/modelcontextprotocol/inspector) for quick testing.
+
+### 5. Platform frontend (optional)
+
+```bash
+cd apps/platform/web
+npm install
+npm run dev   # http://localhost:5173 — proxies /api to port 8002
+```
 
 ---
 
-## VPS Setup
+## Production Deployment (VPS)
 
 ### Prerequisites
 
 - Ubuntu 22.04+
 - Python 3.11+
 - Nginx + Certbot (TLS)
-- Domain with DNS pointing to VPS
+- Domain with DNS pointed to your VPS
 
-### 1. Clone repo & install
+### 1. Clone and install
 
 ```bash
-cd /root
-git clone https://github.com/maulairfani/envel-mcp-server.git
-cd envel-mcp-server
+cd /opt
+git clone https://github.com/maulairfani/envel-mcp.git
+cd envel-mcp
 pip install -e apps/mcp-server
 pip install -e apps/auth-server
+pip install -e apps/platform/server
 ```
 
 ### 2. Create users
 
 ```bash
 mkdir -p users
-python scripts/add_user.py irfani your-password --db-path /root/envel-mcp-server/users/irfani.db
+python scripts/add_user.py alice strongpassword --db-path /opt/envel-mcp/users/alice.db
 ```
 
-This creates `users.db` with bcrypt-hashed credentials.
+This creates `users.db` with a bcrypt-hashed password entry.
 
-### 3. Create `.env` file
-
-```bash
-cp .env.example .env
-```
-
-Fill `.env` with your domain:
+### 3. Configure environment
 
 ```env
-MCP_BASE_URL=https://your-domain.com/envel/mcp
-AS_BASE_URL=https://your-domain.com/envel/auth
+MCP_BASE_URL=https://your-domain.com/mcp
+AS_BASE_URL=https://your-domain.com/auth
 INTROSPECT_URL=http://127.0.0.1:9004/introspect
-USERS_DB=/root/envel-mcp-server/users.db
+USERS_DB=/opt/envel-mcp/users.db
 PORT=8001
 AUTH_PORT=9004
 ```
 
-> `USERS_DB` must be set explicitly — there is no default fallback.
+> `USERS_DB` has no default — it must be set explicitly.
 
-### 4. Create systemd service for Auth Server
+### 4. Create systemd services
 
-```bash
-nano /etc/systemd/system/envel-auth.service
-```
+**`/etc/systemd/system/envel-auth.service`**
 
 ```ini
 [Unit]
@@ -138,8 +188,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/envel-mcp-server
-EnvironmentFile=/root/envel-mcp-server/.env
+WorkingDirectory=/opt/envel-mcp
+EnvironmentFile=/opt/envel-mcp/.env
 ExecStart=envel-auth
 Restart=on-failure
 RestartSec=5
@@ -148,11 +198,7 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### 5. Create systemd service for MCP Server
-
-```bash
-nano /etc/systemd/system/envel-mcp.service
-```
+**`/etc/systemd/system/envel-mcp.service`**
 
 ```ini
 [Unit]
@@ -162,8 +208,8 @@ After=network.target envel-auth.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/envel-mcp-server
-EnvironmentFile=/root/envel-mcp-server/.env
+WorkingDirectory=/opt/envel-mcp
+EnvironmentFile=/opt/envel-mcp/.env
 ExecStart=envel
 Restart=on-failure
 RestartSec=5
@@ -172,25 +218,22 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### 6. Enable & start services
+Enable and start:
 
 ```bash
 systemctl daemon-reload
 systemctl enable envel-auth envel-mcp
 systemctl start envel-auth envel-mcp
-
-# Check status
-systemctl status envel-auth
-systemctl status envel-mcp
+systemctl status envel-auth envel-mcp
 ```
 
-### 7. Configure Nginx
+### 5. Configure Nginx
 
-Add the following block inside your `server { ... }` in Nginx config (usually `/etc/nginx/sites-enabled/default`):
+Inside your `server { ... }` block:
 
 ```nginx
 # MCP Server
-location /envel/mcp/ {
+location /mcp/ {
     proxy_pass http://127.0.0.1:8001/mcp/;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
@@ -207,7 +250,7 @@ location /envel/mcp/ {
 }
 
 # Auth Server
-location /envel/auth/ {
+location /auth/ {
     proxy_pass http://127.0.0.1:9004/;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
@@ -216,51 +259,58 @@ location /envel/auth/ {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
-# OAuth discovery (required by MCP clients)
-location /.well-known/oauth-protected-resource/envel {
+# OAuth discovery (required by some MCP clients)
+location /.well-known/oauth-protected-resource {
     proxy_pass http://127.0.0.1:8001/mcp/.well-known/oauth-protected-resource;
     proxy_set_header Host $http_host;
 }
 ```
 
-Test and reload Nginx:
-
 ```bash
 nginx -t && systemctl reload nginx
 ```
 
-### 8. Add to MCP client
+### 6. Add to MCP client
 
-1. Open your MCP client settings (e.g., **claude.ai → Settings → Integrations → Add**)
-2. Enter URL: `https://your-domain.com/envel/mcp/`
-3. Log in with username & password from `users.json`
+1. Open your MCP client settings (e.g. **Claude → Settings → Integrations → Add**)
+2. Server URL: `https://your-domain.com/mcp/`
+3. Log in with the username and password you created in step 2.
+
+---
+
+## Configuration Reference
+
+| Variable | Required | Description |
+|---|---|---|
+| `TEST_TOKEN` | Dev only | Accepts any request with this token; bypasses auth server |
+| `TEST_DB` | Dev only | SQLite DB path used with `TEST_TOKEN` |
+| `MCP_BASE_URL` | Production | Public URL of the MCP server |
+| `AS_BASE_URL` | Production | Public URL of the auth server |
+| `INTROSPECT_URL` | Production | Internal introspect endpoint, e.g. `http://127.0.0.1:9004/introspect` |
+| `USERS_DB` | Production | Absolute path to `users.db` |
+| `PORT` | Optional | MCP server port (default: `8001`) |
+| `AUTH_PORT` | Optional | Auth server port (default: `9004`) |
 
 ---
 
 ## User Management
 
-### Add a new user
-
 ```bash
-python scripts/add_user.py new_username their-password
+# Add a user (default db path: ./users/<username>.db)
+python scripts/add_user.py <username> <password>
+
+# Add a user with a custom db path
+python scripts/add_user.py <username> <password> --db-path /path/to/<username>.db
 ```
 
-This hashes the password with bcrypt and stores it in `users.db`. Default db_path: `./users/<username>.db`.
-
-To specify a custom db path:
-
-```bash
-python scripts/add_user.py new_username their-password --db-path /path/to/new_username.db
-```
-
-> Changes take effect immediately without restarting services.
+Changes take effect immediately — no service restart needed.
 
 ---
 
-## Update Deployment
+## Updating
 
 ```bash
-cd /root/envel-mcp-server
+cd /opt/envel-mcp
 git pull
 pip install -e apps/mcp-server
 pip install -e apps/auth-server
@@ -272,14 +322,20 @@ systemctl restart envel-auth envel-mcp
 ## Troubleshooting
 
 ```bash
-# View realtime logs
+# Live logs
 journalctl -u envel-mcp -f
 journalctl -u envel-auth -f
 
-# Check if services are running
+# Service status
 systemctl status envel-mcp envel-auth
 
-# Test endpoints directly (bypass Nginx)
+# Direct endpoint checks (bypasses Nginx)
 curl http://localhost:8001/health
-curl -X POST http://localhost:9004/introspect -d "token=test"
+curl -X POST http://localhost:9004/introspect -d "token=<your-token>"
 ```
+
+---
+
+## License
+
+MIT
