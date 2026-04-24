@@ -4,16 +4,28 @@ import { AmountText } from "@/components/shared/AmountText"
 import { ProgressBar } from "@/components/shared/ProgressBar"
 import type { Envelope, EnvelopeBudget } from "@/hooks/useEnvelopes"
 
-function savingsBadge(envelope: Envelope): string | null {
+function formatDeadline(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number)
+  if (!y || !m || !d) return iso
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  return `${d} ${months[m - 1]} ${y}`
+}
+
+function targetBadge(envelope: Envelope): string | null {
   const t = envelope.target
   if (!t) return null
   switch (t.type) {
+    case "monthly_spending":
+      return `Limit ${formatIDR(t.amount)}/mo`
     case "monthly_savings":
       return `Save ${formatIDR(t.amount)}/mo`
     case "savings_balance":
       return `Goal ${formatIDR(t.amount)}`
     case "needed_by_date":
-      return `${formatIDR(t.amount)} by deadline`
+      return t.deadline
+        ? `${formatIDR(t.amount)} by ${formatDeadline(t.deadline)}`
+        : `${formatIDR(t.amount)} by deadline`
     default:
       return null
   }
@@ -34,7 +46,7 @@ export function EnvelopeRow({
 }: EnvelopeRowProps) {
   const funded = budget.carryover + budget.assigned
   const overspent = budget.available < 0
-  const savingsLabel = savingsBadge(envelope)
+  const savingsLabel = targetBadge(envelope)
 
   return (
     <button
