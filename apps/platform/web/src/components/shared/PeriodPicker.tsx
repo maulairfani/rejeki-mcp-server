@@ -4,6 +4,10 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ]
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+]
 
 export interface PeriodPickerProps {
   /** YYYY-MM */
@@ -31,23 +35,25 @@ export function PeriodPicker({ period, onChange }: PeriodPickerProps) {
     onChange(formatPeriod(y, m))
   }
 
-  const label = `${MONTHS[month - 1]} ${year}`
+  const labelFull = `${MONTHS[month - 1]} ${year}`
+  const labelShort = `${MONTHS_SHORT[month - 1]} ${year}`
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5 sm:gap-1">
       <button
         onClick={() => shift(-1)}
-        className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-8"
         aria-label="Previous month"
       >
         <ChevronLeft className="size-4" />
       </button>
-      <span className="min-w-[140px] text-center text-sm font-heading font-semibold">
-        {label}
+      <span className="min-w-[72px] text-center text-xs font-heading font-semibold sm:min-w-[140px] sm:text-sm">
+        <span className="sm:hidden">{labelShort}</span>
+        <span className="hidden sm:inline">{labelFull}</span>
       </span>
       <button
         onClick={() => shift(1)}
-        className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-8"
         aria-label="Next month"
       >
         <ChevronRight className="size-4" />
