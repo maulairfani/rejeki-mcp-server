@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 
 // ── Types ────────────────────────────────────────────────
@@ -21,11 +21,12 @@ export interface Envelope {
   icon: string
   type: "income" | "expense"
   groupId: number | null
+  sortOrder: number
   target: EnvelopeTarget | null
 }
 
 export interface EnvelopeGroup {
-  id: number
+  id: number | null
   name: string
   sortOrder: number
 }
@@ -54,8 +55,10 @@ interface EnvelopeRow {
   id: number
   name: string
   icon: string
+  group_id: number | null
   group_name: string
   group_sort: number
+  sort_order: number
   target_type: string | null
   target_amount: number | null
   target_deadline: string | null
@@ -79,7 +82,8 @@ function transformRows(rows: EnvelopeRow[]): {
       name: r.name,
       icon: r.icon || "📦",
       type: "expense" as const,
-      groupId: null,
+      groupId: r.group_id,
+      sortOrder: r.sort_order,
       target: r.target_type
         ? {
             type: r.target_type as TargetType,
@@ -97,25 +101,30 @@ function transformRows(rows: EnvelopeRow[]): {
     },
   }))
 
-  // Group by group_name + group_sort
+  // Group by group_id (null → Uncategorized). Preserve backend order (rows come sorted).
   const groupMap = new Map<
     string,
-    { sort: number; items: (typeof allEnvelopes)[number][] }
+    { id: number | null; name: string; sort: number; items: (typeof allEnvelopes)[number][] }
   >()
 
   for (const r of rows) {
-    const key = r.group_name
+    const key = r.group_id === null ? "null" : String(r.group_id)
     if (!groupMap.has(key)) {
-      groupMap.set(key, { sort: r.group_sort, items: [] })
+      groupMap.set(key, {
+        id: r.group_id,
+        name: r.group_name,
+        sort: r.group_sort,
+        items: [],
+      })
     }
     const item = allEnvelopes.find((e) => e.envelope.id === r.id)!
     groupMap.get(key)!.items.push(item)
   }
 
-  const groups: EnvelopeGroupWithBudgets[] = Array.from(groupMap.entries())
-    .sort(([, a], [, b]) => a.sort - b.sort)
-    .map(([name, { sort, items }], idx) => ({
-      group: { id: idx + 1, name, sortOrder: sort },
+  const groups: EnvelopeGroupWithBudgets[] = Array.from(groupMap.values())
+    .sort((a, b) => a.sort - b.sort)
+    .map(({ id, name, sort, items }) => ({
+      group: { id, name, sortOrder: sort },
       items,
       totalAssigned: items.reduce((s, i) => s + i.budget.assigned, 0),
       totalAvailable: items.reduce((s, i) => s + i.budget.available, 0),
@@ -135,6 +144,47 @@ export function useEnvelopes(period: string) {
   const { groups, allEnvelopes } = data ? transformRows(data) : { groups: [], allEnvelopes: [] }
 
   return { groups, allEnvelopes, isLoading, error }
+}
+
+// ── Reorder mutations ───────────────────────────────────
+
+export interface EnvelopeReorderItem {
+  id: number
+  group_id: number | null
+  sort_order: number
+}
+
+export interface GroupReorderItem {
+  id: number
+  sort_order: number
+}
+
+export function useReorderEnvelopes(period: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (items: EnvelopeReorderItem[]) =>
+      api("/api/envelopes/reorder", {
+        method: "PATCH",
+        body: JSON.stringify({ items }),
+      }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["envelopes", period] })
+    },
+  })
+}
+
+export function useReorderEnvelopeGroups(period: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (items: GroupReorderItem[]) =>
+      api("/api/envelopes/groups/reorder", {
+        method: "PATCH",
+        body: JSON.stringify({ items }),
+      }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["envelopes", period] })
+    },
+  })
 }
 
 // ── Cover overspent helper ──────────────────────────────

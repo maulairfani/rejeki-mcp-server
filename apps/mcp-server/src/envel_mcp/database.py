@@ -46,3 +46,8 @@ def _migrate(db: Database) -> None:
     if "archived" not in cols:
         db._conn.execute("ALTER TABLE envelopes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
         db._conn.commit()
+    if "sort_order" not in cols:
+        db._conn.execute("ALTER TABLE envelopes ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+        # Backfill by id so existing order is stable when user first drags
+        db._conn.execute("UPDATE envelopes SET sort_order = id WHERE sort_order = 0")
+        db._conn.commit()

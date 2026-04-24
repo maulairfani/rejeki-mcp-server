@@ -4,13 +4,37 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from envel_platform.auth import require_user
-from envel_platform.db import assign_envelope, get_envelope_status
+from envel_platform.db import (
+    assign_envelope,
+    get_envelope_status,
+    reorder_envelope_groups,
+    reorder_envelopes,
+)
 
 router = APIRouter()
 
 
 class AssignRequest(BaseModel):
     assigned: float
+
+
+class EnvelopeReorderItem(BaseModel):
+    id: int
+    group_id: int | None = None
+    sort_order: int
+
+
+class GroupReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+
+class ReorderRequest(BaseModel):
+    items: list[EnvelopeReorderItem]
+
+
+class GroupReorderRequest(BaseModel):
+    items: list[GroupReorderItem]
 
 
 @router.get("")
@@ -21,6 +45,24 @@ async def envelopes(
     if not period:
         period = datetime.now().strftime("%Y-%m")
     return get_envelope_status(username, period)
+
+
+@router.patch("/reorder")
+async def reorder(
+    body: ReorderRequest,
+    username: str = Depends(require_user),
+):
+    reorder_envelopes(username, [i.model_dump() for i in body.items])
+    return {"ok": True}
+
+
+@router.patch("/groups/reorder")
+async def reorder_groups(
+    body: GroupReorderRequest,
+    username: str = Depends(require_user),
+):
+    reorder_envelope_groups(username, [i.model_dump() for i in body.items])
+    return {"ok": True}
 
 
 @router.patch("/{envelope_id}/assign")

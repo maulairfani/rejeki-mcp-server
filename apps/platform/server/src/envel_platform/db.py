@@ -4,6 +4,9 @@ import os
 import sqlite3
 
 
+_MIGRATED: set[str] = set()
+
+
 def _derive_db_key(username: str) -> str | None:
     """Derive a per-user SQLCipher key from the master DB_ENCRYPTION_KEY.
 
@@ -24,12 +27,26 @@ def _open_user_db(path: str, username: str) -> sqlite3.Connection:
             conn = sqlcipher3.connect(path)
             conn.execute(f"PRAGMA key = '{key}'")
             conn.row_factory = sqlite3.Row
+            _ensure_migrated(conn, path)
             return conn
         except ImportError:
             pass
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
+    _ensure_migrated(conn, path)
     return conn
+
+
+def _ensure_migrated(conn: sqlite3.Connection, path: str) -> None:
+    """Add columns the MCP server might not have migrated yet (idempotent, per-process cache)."""
+    if path in _MIGRATED:
+        return
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(envelopes)").fetchall()}
+    if "sort_order" not in cols:
+        conn.execute("ALTER TABLE envelopes ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+        conn.execute("UPDATE envelopes SET sort_order = id WHERE sort_order = 0")
+        conn.commit()
+    _MIGRATED.add(path)
 
 
 def get_conn(username: str) -> sqlite3.Connection:
@@ -93,8 +110,10 @@ def get_envelope_status(username: str, period: str) -> list[dict]:
             e.id,
             e.name,
             e.icon,
+            e.group_id,
             COALESCE(eg.name, 'Uncategorized') AS group_name,
             COALESCE(eg.sort_order, 999) AS group_sort,
+            e.sort_order,
             e.target_type,
             e.target_amount,
             e.target_deadline,
@@ -107,7 +126,7 @@ def get_envelope_status(username: str, period: str) -> list[dict]:
         LEFT JOIN transactions t ON t.envelope_id = e.id AND strftime('%Y-%m', t.date) = ?
         WHERE e.type = 'expense'
         GROUP BY e.id
-        ORDER BY COALESCE(eg.sort_order, 999), e.name
+        ORDER BY COALESCE(eg.sort_order, 999), e.sort_order, e.name
     """
     with get_conn(username) as conn:
         rows = conn.execute(sql, (period, period)).fetchall()
@@ -124,6 +143,36 @@ def get_envelope_status(username: str, period: str) -> list[dict]:
         d["overspent"] = d["available"] < 0
         result.append(d)
     return result
+
+
+def reorder_envelopes(
+    username: str, items: list[dict]
+) -> None:
+    """Atomically update sort_order (and optionally group_id) for envelopes.
+
+    Each item: {id: int, group_id: int | None, sort_order: int}
+    """
+    with get_conn(username) as conn:
+        for item in items:
+            conn.execute(
+                "UPDATE envelopes SET sort_order = ?, group_id = ? WHERE id = ?",
+                (item["sort_order"], item.get("group_id"), item["id"]),
+            )
+        conn.commit()
+
+
+def reorder_envelope_groups(username: str, items: list[dict]) -> None:
+    """Atomically update sort_order for envelope groups.
+
+    Each item: {id: int, sort_order: int}
+    """
+    with get_conn(username) as conn:
+        for item in items:
+            conn.execute(
+                "UPDATE envelope_groups SET sort_order = ? WHERE id = ?",
+                (item["sort_order"], item["id"]),
+            )
+        conn.commit()
 
 
 def assign_envelope(username: str, envelope_id: int, period: str, assigned: float) -> None:
