@@ -18,15 +18,15 @@ export function AmountsVisibleBadge() {
       {showNominal ? (
         <>
           <span className="inline-block h-[7px] w-[7px] rounded-full bg-brand" />
-          <span>Amounts visible</span>
+          <span className="hidden sm:inline">Amounts visible</span>
+          <Eye className="size-3.5 sm:hidden" />
         </>
       ) : (
         <>
           <EyeOff className="size-3.5" />
-          <span>Amounts hidden</span>
+          <span className="hidden sm:inline">Amounts hidden</span>
         </>
       )}
-      {showNominal && <Eye className="sr-only" />}
     </button>
   )
 }

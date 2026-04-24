@@ -15,7 +15,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, children, right, hideAmountsBadge }: PageHeaderProps) {
   return (
-    <div className="flex h-[60px] flex-shrink-0 items-center justify-between border-b border-border bg-card px-6">
+    <div className="flex h-[60px] flex-shrink-0 items-center justify-between border-b border-border bg-card px-3 sm:px-6">
       <div className="flex items-center gap-3">
         <SidebarTrigger className="-ml-1 text-text-muted" />
         <Separator orientation="vertical" className="data-[orientation=vertical]:h-4" />
