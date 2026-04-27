@@ -86,6 +86,22 @@ CREATE TABLE IF NOT EXISTS wishlist (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- User-defined tags. Used to mark events that span multiple envelopes
+-- (e.g., "konser", "liburan-bali") so spending can be analyzed by event.
+CREATE TABLE IF NOT EXISTS tags (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS transaction_tags (
+    transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    tag_id         INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (transaction_id, tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag ON transaction_tags(tag_id);
+
 CREATE TABLE IF NOT EXISTS user_memory (
     id         INTEGER PRIMARY KEY CHECK (id = 1),
     content    TEXT NOT NULL DEFAULT '',

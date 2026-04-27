@@ -8,12 +8,21 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import type { CSSProperties } from "react"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { AmountText } from "@/components/shared/AmountText"
 import { PeriodPicker, currentPeriod } from "@/components/shared/PeriodPicker"
 import { useDailyExpenses } from "@/hooks/useAnalytics"
+import { useTransactions } from "@/hooks/useTransactions"
 import { formatIDRShort } from "@/lib/format"
 import { CHART_COLORS } from "@/lib/chart-colors"
+
+const TAG_HUES = [145, 200, 270, 310, 50, 25, 175, 240]
+function tagHue(label: string): number {
+  let h = 0
+  for (const ch of label) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return TAG_HUES[h % TAG_HUES.length]
+}
 
 const MONTHS_LONG = [
   "January", "February", "March", "April", "May", "June",
@@ -68,6 +77,24 @@ function ChartTooltip({
 export function DashboardPage({ showNominal }: { showNominal: boolean }) {
   const [period, setPeriod] = useState(currentPeriod)
   const { data, loading, error } = useDailyExpenses(period)
+  const { transactions: periodTxns } = useTransactions(period)
+
+  const tagBreakdown = useMemo(() => {
+    const acc = new Map<string, { total: number; count: number }>()
+    for (const t of periodTxns) {
+      if (t.type !== "expense" || !t.tags.length) continue
+      for (const name of t.tags) {
+        const e = acc.get(name) ?? { total: 0, count: 0 }
+        e.total += Math.abs(t.amount)
+        e.count += 1
+        acc.set(name, e)
+      }
+    }
+    return Array.from(acc.entries())
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.total - a.total)
+  }, [periodTxns])
+  const tagBreakdownTotal = tagBreakdown.reduce((s, t) => s + t.total, 0)
   // null = all visible (default). Set = only those envelope IDs are visible.
   const [selected, setSelected] = useState<Set<number> | null>(null)
 
@@ -223,6 +250,69 @@ export function DashboardPage({ showNominal }: { showNominal: boolean }) {
             </ResponsiveContainer>
           )}
         </div>
+
+        {tagBreakdown.length > 0 && (
+          <div className="mt-6 rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="mb-3 flex items-end justify-between">
+              <div>
+                <div className="font-heading text-[15px] font-bold text-text-primary">
+                  Spending by Tag
+                </div>
+                <div className="text-[11.5px] text-text-muted">
+                  {periodLabel(period)} · expenses only
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10.5px] text-text-muted">Tagged total</div>
+                <AmountText
+                  amount={tagBreakdownTotal}
+                  showNominal={showNominal}
+                  size="md"
+                  tone="neutral"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              {tagBreakdown.map((t) => {
+                const share = tagBreakdownTotal
+                  ? (t.total / tagBreakdownTotal) * 100
+                  : 0
+                return (
+                  <div key={t.name} className="flex items-center gap-3">
+                    <span
+                      className="hue-pill inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11.5px] font-semibold"
+                      style={{ "--pill-h": tagHue(t.name) } as CSSProperties}
+                    >
+                      #{t.name}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-bg-muted">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${share}%`,
+                            background: `oklch(60% 0.14 ${tagHue(t.name)})`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <AmountText
+                        amount={t.total}
+                        showNominal={showNominal}
+                        size="sm"
+                        tone="neutral"
+                      />
+                      <div className="text-[10.5px] text-text-muted tabular-nums">
+                        {t.count} tx · {share.toFixed(0)}%
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="h-10" />
       </div>

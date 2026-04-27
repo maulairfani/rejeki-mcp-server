@@ -7,6 +7,7 @@ import {
 } from "@/hooks/useTransactions"
 import { useAccounts } from "@/hooks/useAccounts"
 import { useEnvelopes } from "@/hooks/useEnvelopes"
+import { useTags } from "@/hooks/useTags"
 import {
   TransactionFilters,
   type FilterState,
@@ -17,21 +18,30 @@ import {
 } from "@/components/shared/PeriodPicker"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { TransactionDayGroup } from "@/components/transactions/TransactionDayGroup"
+import { TransactionDetailDialog } from "@/components/transactions/TransactionDetailDialog"
 
 const DEFAULT_FILTERS: FilterState = {
   type: "all",
   search: "",
   account: "all",
   envelope: "all",
+  tag: "all",
 }
 
 export function TransactionsPage({ showNominal }: { showNominal: boolean }) {
   const [period, setPeriod] = useState(currentPeriod)
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const { transactions, isLoading } = useTransactions(period)
+
+  const selected = useMemo(
+    () => transactions.find((t) => t.id === selectedId) ?? null,
+    [transactions, selectedId]
+  )
   const { accounts: allAccounts } = useAccounts()
   const { allEnvelopes } = useEnvelopes(period)
+  const { tags: allTags } = useTags()
 
   const accounts = useMemo(
     () => allAccounts.map((a) => a.name).sort(),
@@ -41,6 +51,7 @@ export function TransactionsPage({ showNominal }: { showNominal: boolean }) {
     () => allEnvelopes.map((e) => e.envelope.name).sort(),
     [allEnvelopes]
   )
+  const tagNames = useMemo(() => allTags.map((t) => t.name), [allTags])
 
   const filtered = useMemo(
     () => filterTransactions(transactions, filters),
@@ -62,6 +73,7 @@ export function TransactionsPage({ showNominal }: { showNominal: boolean }) {
           onChange={setFilters}
           accounts={accounts}
           envelopes={envelopes}
+          tags={tagNames}
           resultCount={filtered.length}
         />
       </div>
@@ -97,12 +109,22 @@ export function TransactionsPage({ showNominal }: { showNominal: boolean }) {
                 key={group.date}
                 group={group}
                 showNominal={showNominal}
+                onRowClick={setSelectedId}
               />
             ))}
             <div className="h-10" />
           </>
         )}
       </div>
+
+      <TransactionDetailDialog
+        transaction={selected}
+        open={selectedId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null)
+        }}
+        showNominal={showNominal}
+      />
     </div>
   )
 }

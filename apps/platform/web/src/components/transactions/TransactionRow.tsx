@@ -22,9 +22,10 @@ function pillHue(label: string): number {
 interface TransactionRowProps {
   transaction: Transaction
   showNominal: boolean
+  onClick?: () => void
 }
 
-export function TransactionRow({ transaction, showNominal }: TransactionRowProps) {
+export function TransactionRow({ transaction, showNominal, onClick }: TransactionRowProps) {
   const icon =
     transaction.type !== "transfer" && transaction.envelopeIcon
       ? transaction.envelopeIcon
@@ -47,22 +48,39 @@ export function TransactionRow({ transaction, showNominal }: TransactionRowProps
         ? -Math.abs(transaction.amount)
         : transaction.amount // transfer: neutral
 
+  const tags = transaction.tags
+
   return (
-    <div className="grid grid-cols-[28px_1fr_80px] gap-3 border-b border-border-muted px-7 py-2.5 transition-colors hover:bg-bg-muted md:grid-cols-[28px_1fr_1fr_100px_80px_90px]">
+    <button
+      type="button"
+      onClick={onClick}
+      className="grid w-full cursor-pointer grid-cols-[28px_1fr_80px] gap-3 border-b border-border-muted px-7 py-2.5 text-left transition-colors hover:bg-bg-muted md:grid-cols-[28px_1fr_1fr_100px_80px_90px]"
+    >
       {/* Icon */}
       <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-bg-muted text-[13px]">
         {icon}
       </div>
 
-      {/* Payee (+ mobile subtitle with memo/envelope/account) */}
+      {/* Payee + tag badges (+ mobile subtitle) */}
       <div className="min-w-0">
-        <p
-          className={`truncate text-[13.5px] font-medium ${
-            payee === "—" ? "text-text-muted" : "text-text-primary"
-          }`}
-        >
-          {payee}
-        </p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p
+            className={`min-w-0 truncate text-[13.5px] font-medium ${
+              payee === "—" ? "text-text-muted" : "text-text-primary"
+            }`}
+          >
+            {payee}
+          </p>
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="hue-pill inline-flex shrink-0 items-center rounded-full px-1.5 py-px text-[10.5px] font-semibold"
+              style={{ "--pill-h": pillHue(tag) } as CSSProperties}
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
         <p className="truncate text-[11.5px] text-text-muted md:hidden">
           {[memo || envelope, account].filter(Boolean).join(" · ") || "\u00A0"}
         </p>
@@ -118,6 +136,6 @@ export function TransactionRow({ transaction, showNominal }: TransactionRowProps
           }
         />
       </div>
-    </div>
+    </button>
   )
 }

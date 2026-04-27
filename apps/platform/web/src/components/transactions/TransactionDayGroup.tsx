@@ -26,11 +26,13 @@ function formatDayHeader(iso: string): { label: string; relative: string | null 
 interface TransactionDayGroupProps {
   group: DayGroup
   showNominal: boolean
+  onRowClick?: (transactionId: number) => void
 }
 
 export function TransactionDayGroup({
   group,
   showNominal,
+  onRowClick,
 }: TransactionDayGroupProps) {
   const { label, relative } = formatDayHeader(group.date)
   const net = group.income - group.expense
@@ -61,6 +63,7 @@ export function TransactionDayGroup({
           key={txn.id}
           transaction={txn}
           showNominal={showNominal}
+          onClick={onRowClick ? () => onRowClick(txn.id) : undefined}
         />
       ))}
     </div>

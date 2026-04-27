@@ -50,6 +50,22 @@ def _ensure_migrated(conn: sqlite3.Connection, path: str) -> None:
     if "icon" not in wishlist_cols:
         conn.execute("ALTER TABLE wishlist ADD COLUMN icon TEXT NOT NULL DEFAULT '🎁'")
         conn.commit()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tags (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS transaction_tags (
+            transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+            tag_id         INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY (transaction_id, tag_id)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag ON transaction_tags(tag_id)")
+    conn.commit()
     _MIGRATED.add(path)
 
 
@@ -259,7 +275,13 @@ def get_transactions(
             a.name AS account_name,
             ta.name AS to_account_name,
             e.name AS envelope_name,
-            e.icon AS envelope_icon
+            e.icon AS envelope_icon,
+            (
+                SELECT GROUP_CONCAT(tg.name, '|')
+                FROM transaction_tags tt
+                JOIN tags tg ON tg.id = tt.tag_id
+                WHERE tt.transaction_id = t.id
+            ) AS tags
         FROM transactions t
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN accounts ta ON t.to_account_id = ta.id
@@ -271,7 +293,87 @@ def get_transactions(
     params.extend([limit, offset])
     with get_conn(username) as conn:
         rows = conn.execute(sql, params).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        raw = d.pop("tags", None)
+        d["tags"] = sorted(raw.split("|")) if raw else []
+        out.append(d)
+    return out
+
+
+def list_tags(username: str) -> list[dict]:
+    """Return all tags with usage counts, ordered by most-used first."""
+    sql = """
+        SELECT tg.id, tg.name,
+               COALESCE(c.usage, 0) AS usage
+        FROM tags tg
+        LEFT JOIN (
+            SELECT tag_id, COUNT(*) AS usage
+            FROM transaction_tags
+            GROUP BY tag_id
+        ) c ON c.tag_id = tg.id
+        ORDER BY usage DESC, tg.name COLLATE NOCASE ASC
+    """
+    with get_conn(username) as conn:
+        rows = conn.execute(sql).fetchall()
     return [dict(r) for r in rows]
+
+
+def set_transaction_tags(username: str, transaction_id: int, tag_names: list[str]) -> list[str]:
+    """Replace the tag set for a transaction. Auto-creates tags that don't exist.
+
+    Tag names are normalized (stripped, deduped case-insensitively).
+    Returns the final set of tag names attached to the transaction.
+    """
+    seen: dict[str, str] = {}
+    for raw in tag_names:
+        name = (raw or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key not in seen:
+            seen[key] = name
+    cleaned = list(seen.values())
+
+    with get_conn(username) as conn:
+        # Confirm transaction exists.
+        row = conn.execute(
+            "SELECT 1 FROM transactions WHERE id = ?", (transaction_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError(f"Transaction {transaction_id} not found")
+
+        tag_ids: list[int] = []
+        for name in cleaned:
+            existing = conn.execute(
+                "SELECT id FROM tags WHERE name = ? COLLATE NOCASE", (name,)
+            ).fetchone()
+            if existing:
+                tag_ids.append(existing["id"])
+            else:
+                cur = conn.execute("INSERT INTO tags (name) VALUES (?)", (name,))
+                tag_ids.append(cur.lastrowid)
+
+        conn.execute(
+            "DELETE FROM transaction_tags WHERE transaction_id = ?", (transaction_id,)
+        )
+        conn.executemany(
+            "INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)",
+            [(transaction_id, tid) for tid in tag_ids],
+        )
+        conn.commit()
+
+        rows = conn.execute(
+            """
+            SELECT tg.name FROM transaction_tags tt
+            JOIN tags tg ON tg.id = tt.tag_id
+            WHERE tt.transaction_id = ?
+            ORDER BY tg.name COLLATE NOCASE
+            """,
+            (transaction_id,),
+        ).fetchall()
+    return [r["name"] for r in rows]
 
 
 def get_wishlist(username: str, status: str | None = None) -> list[dict]:

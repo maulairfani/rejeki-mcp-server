@@ -6,6 +6,7 @@ export interface FilterState {
   search: string
   account: string | "all"
   envelope: string | "all"
+  tag: string | "all"
 }
 
 const TYPE_OPTIONS: { value: TransactionType | "all"; label: string }[] = [
@@ -20,6 +21,7 @@ interface TransactionFiltersProps {
   onChange: (filters: FilterState) => void
   accounts: string[]
   envelopes: string[]
+  tags: string[]
   resultCount: number
 }
 
@@ -52,13 +54,15 @@ export function TransactionFilters({
   onChange,
   accounts,
   envelopes,
+  tags,
   resultCount,
 }: TransactionFiltersProps) {
   const hasActiveFilters =
     filters.type !== "all" ||
     filters.search !== "" ||
     filters.account !== "all" ||
-    filters.envelope !== "all"
+    filters.envelope !== "all" ||
+    filters.tag !== "all"
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -120,11 +124,25 @@ export function TransactionFilters({
           </option>
         ))}
       </select>
+      {tags.length > 0 && (
+        <select
+          value={filters.tag}
+          onChange={(e) => onChange({ ...filters, tag: e.target.value })}
+          className="h-7 rounded-md border border-border bg-bg px-2 text-xs text-text-secondary focus:border-brand focus:outline-none"
+        >
+          <option value="all">All tags</option>
+          {tags.map((t) => (
+            <option key={t} value={t}>
+              #{t}
+            </option>
+          ))}
+        </select>
+      )}
 
       {hasActiveFilters && (
         <button
           onClick={() =>
-            onChange({ type: "all", search: "", account: "all", envelope: "all" })
+            onChange({ type: "all", search: "", account: "all", envelope: "all", tag: "all" })
           }
           className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-text-muted transition-colors hover:text-text-secondary"
         >

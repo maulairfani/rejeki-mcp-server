@@ -13,6 +13,7 @@ export interface Transaction {
   toAccount: string | null
   payee: string | null
   memo: string | null
+  tags: string[]
   date: string // ISO date string
 }
 
@@ -36,6 +37,7 @@ interface TransactionRow {
   to_account_name: string | null
   envelope_name: string | null
   envelope_icon: string | null
+  tags: string[]
 }
 
 function transformRow(r: TransactionRow): Transaction {
@@ -49,6 +51,7 @@ function transformRow(r: TransactionRow): Transaction {
     toAccount: r.to_account_name,
     payee: r.payee,
     memo: r.memo,
+    tags: r.tags ?? [],
     date: r.date.slice(0, 10), // normalize to YYYY-MM-DD
   }
 }
@@ -84,6 +87,7 @@ export interface TransactionFilters {
   search: string
   account: string | "all"
   envelope: string | "all"
+  tag: string | "all"
 }
 
 export function filterTransactions(
@@ -99,9 +103,14 @@ export function filterTransactions(
       (txn.envelope ?? "") !== filters.envelope
     )
       return false
+    if (
+      filters.tag !== "all" &&
+      !txn.tags.some((t) => t.toLowerCase() === filters.tag.toLowerCase())
+    )
+      return false
     if (filters.search) {
       const q = filters.search.toLowerCase()
-      const haystack = [txn.payee, txn.memo, txn.envelope, txn.account]
+      const haystack = [txn.payee, txn.memo, txn.envelope, txn.account, ...txn.tags]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
