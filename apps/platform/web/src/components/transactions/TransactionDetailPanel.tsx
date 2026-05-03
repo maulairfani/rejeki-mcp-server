@@ -201,7 +201,7 @@ function SelectedState({
           <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
             Tags
           </p>
-          <TagEditor transaction={transaction} period={period} />
+          <TagEditor transaction={transaction} />
         </div>
 
         {/* Delete */}
@@ -401,13 +401,7 @@ function EditForm({
 
 // ── Tag editor ────────────────────────────────────────────────────────────────
 
-function TagEditor({
-  transaction,
-  period,
-}: {
-  transaction: Transaction
-  period: string
-}) {
+function TagEditor({ transaction }: { transaction: Transaction }) {
   const { tags: allTags } = useTags()
   const update = useUpdateTransactionTags()
   const [tags, setTags] = useState<string[]>(transaction.tags)

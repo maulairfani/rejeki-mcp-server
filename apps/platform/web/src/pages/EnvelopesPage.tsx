@@ -71,9 +71,7 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
   const [overrides, setOverrides] = useState<Map<number, EnvelopeBudget>>(
     new Map()
   )
-  const [targetOverrides, setTargetOverrides] = useState<
-    Map<number, Envelope["target"]>
-  >(new Map())
+  const [targetOverrides] = useState<Map<number, Envelope["target"]>>(new Map())
   const [selectedEnvelopeId, setSelectedEnvelopeId] = useState<number | null>(
     null
   )
@@ -156,14 +154,6 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
 
   async function handleAssign(envelopeId: number, newAssigned: number) {
     await assignEnvelope.mutateAsync({ envelopeId, assigned: newAssigned })
-  }
-
-  function handleTargetChange(envelopeId: number, target: Envelope["target"]) {
-    setTargetOverrides((prev) => {
-      const next = new Map(prev)
-      next.set(envelopeId, target)
-      return next
-    })
   }
 
   // ── Drag & drop ───────────────────────────────────────
