@@ -44,7 +44,7 @@ interface TransactionRow {
   tags: string[]
 }
 
-function transformRow(r: TransactionRow): Transaction {
+export function transformRow(r: TransactionRow): Transaction {
   return {
     id: r.id,
     amount: r.amount,

@@ -142,6 +142,85 @@ def get_accounts(username: str) -> dict:
     return {"accounts": accounts, "total": total}
 
 
+def add_account(username: str, name: str, type_: str, balance: float) -> dict:
+    with get_conn(username) as conn:
+        cur = conn.execute(
+            "INSERT INTO accounts (name, type, balance) VALUES (?, ?, ?)",
+            (name, type_, balance),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, name, type, balance FROM accounts WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+    return dict(row)
+
+
+def edit_account(username: str, account_id: int, name: str, type_: str) -> dict:
+    with get_conn(username) as conn:
+        conn.execute(
+            "UPDATE accounts SET name = ?, type = ? WHERE id = ?",
+            (name, type_, account_id),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, name, type, balance FROM accounts WHERE id = ?", (account_id,)
+        ).fetchone()
+    return dict(row)
+
+
+def update_account_balance(username: str, account_id: int, balance: float) -> dict:
+    with get_conn(username) as conn:
+        conn.execute(
+            "UPDATE accounts SET balance = ? WHERE id = ?", (balance, account_id)
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, name, type, balance FROM accounts WHERE id = ?", (account_id,)
+        ).fetchone()
+    return dict(row)
+
+
+def delete_account(username: str, account_id: int) -> None:
+    with get_conn(username) as conn:
+        conn.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
+        conn.commit()
+
+
+def get_account_transactions(username: str, account_id: int, limit: int = 5) -> list[dict]:
+    """Return recent transactions involving an account (either from or to)."""
+    sql = """
+        SELECT
+            t.id, t.date, t.type, t.amount, t.payee, t.memo,
+            t.account_id, t.envelope_id, t.to_account_id,
+            a.name AS account_name,
+            ta.name AS to_account_name,
+            e.name AS envelope_name,
+            e.icon AS envelope_icon,
+            (
+                SELECT GROUP_CONCAT(tg.name, '|')
+                FROM transaction_tags tt
+                JOIN tags tg ON tg.id = tt.tag_id
+                WHERE tt.transaction_id = t.id
+            ) AS tags
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN accounts ta ON t.to_account_id = ta.id
+        LEFT JOIN envelopes e ON t.envelope_id = e.id
+        WHERE t.account_id = ? OR t.to_account_id = ?
+        ORDER BY t.date DESC
+        LIMIT ?
+    """
+    with get_conn(username) as conn:
+        rows = conn.execute(sql, (account_id, account_id, limit)).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        raw = d.pop("tags", None)
+        d["tags"] = sorted(raw.split("|")) if raw else []
+        out.append(d)
+    return out
+
+
 def create_transaction(
     username: str,
     amount: float,

@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
+import { transformRow } from "@/hooks/useTransactions"
 
 export type AccountType = "bank" | "ewallet" | "cash"
 
@@ -52,4 +53,56 @@ export function useAccounts() {
     .filter((g) => g.accounts.length > 0)
 
   return { accounts, groups, totalBalance, isLoading, error }
+}
+
+// ── Recent transactions for one account ──────────────────
+
+export function useAccountTransactions(accountId: number | null) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["account-transactions", accountId],
+    queryFn: () => api<unknown[]>(`/api/accounts/${accountId}/transactions`),
+    enabled: accountId !== null,
+  })
+  const transactions = (data ?? []).map((r) => transformRow(r as Parameters<typeof transformRow>[0]))
+  return { transactions, isLoading }
+}
+
+// ── Mutations ─────────────────────────────────────────────
+
+export function useCreateAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name: string; type: string; balance: number }) =>
+      api("/api/accounts", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+  })
+}
+
+export function useEditAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, name, type }: { id: number; name: string; type: string }) =>
+      api(`/api/accounts/${id}`, { method: "PATCH", body: JSON.stringify({ name, type }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+  })
+}
+
+export function useUpdateAccountBalance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, balance }: { id: number; balance: number }) =>
+      api(`/api/accounts/${id}/balance`, { method: "PATCH", body: JSON.stringify({ balance }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+  })
+}
+
+export function useDeleteAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api(`/api/accounts/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["accounts"] })
+      qc.invalidateQueries({ queryKey: ["transactions"] })
+    },
+  })
 }

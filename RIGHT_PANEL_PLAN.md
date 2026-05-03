@@ -36,7 +36,7 @@ Semua aksi punya feedback: loading spinner → success checkmark (1.5s) → idle
 
 ---
 
-## Accounts (belum)
+## Accounts ✅ (done)
 
 **Empty state:**
 - Total balance semua akun
