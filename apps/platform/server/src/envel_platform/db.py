@@ -264,6 +264,21 @@ def reorder_envelope_groups(username: str, items: list[dict]) -> None:
         conn.commit()
 
 
+def set_envelope_target(
+    username: str,
+    envelope_id: int,
+    target_type: str | None,
+    target_amount: float | None,
+    target_deadline: str | None,
+) -> None:
+    with get_conn(username) as conn:
+        conn.execute(
+            "UPDATE envelopes SET target_type = ?, target_amount = ?, target_deadline = ? WHERE id = ?",
+            (target_type, target_amount, target_deadline, envelope_id),
+        )
+        conn.commit()
+
+
 def assign_envelope(username: str, envelope_id: int, period: str, assigned: float) -> None:
     sql = """
         INSERT INTO budget_periods (envelope_id, period, assigned, carryover)

@@ -198,6 +198,52 @@ export function useReorderEnvelopeGroups(period: string) {
   })
 }
 
+// ── Set target mutation ──────────────────────────────────
+
+export function useSetEnvelopeTarget(period: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      envelopeId,
+      targetType,
+      targetAmount,
+      targetDeadline,
+    }: {
+      envelopeId: number
+      targetType: string | null
+      targetAmount: number | null
+      targetDeadline: string | null
+    }) =>
+      api(`/api/envelopes/${envelopeId}/target`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          target_type: targetType,
+          target_amount: targetAmount,
+          target_deadline: targetDeadline,
+        }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["envelopes", period] })
+    },
+  })
+}
+
+// ── Assign mutation ─────────────────────────────────────
+
+export function useAssignEnvelope(period: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ envelopeId, assigned }: { envelopeId: number; assigned: number }) =>
+      api(`/api/envelopes/${envelopeId}/assign?period=${period}`, {
+        method: "PATCH",
+        body: JSON.stringify({ assigned }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["envelopes", period] })
+    },
+  })
+}
+
 // ── Cover overspent helper ──────────────────────────────
 
 export interface CoverAction {

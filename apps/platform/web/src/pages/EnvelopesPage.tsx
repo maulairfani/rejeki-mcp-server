@@ -20,6 +20,7 @@ import {
   useEnvelopes,
   useReorderEnvelopes,
   useReorderEnvelopeGroups,
+  useAssignEnvelope,
   applyCover,
   type Envelope,
   type EnvelopeBudget,
@@ -30,7 +31,7 @@ import { PeriodPicker, currentPeriod } from "@/components/shared/PeriodPicker"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { AmountText } from "@/components/shared/AmountText"
 import { EnvelopeGroupSection } from "@/components/envelopes/EnvelopeGroupSection"
-import { EnvelopeDetailDialog } from "@/components/envelopes/EnvelopeDetailDialog"
+import { EnvelopeDetailPanel } from "@/components/envelopes/EnvelopeDetailPanel"
 
 export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
   const [period, setPeriod] = useState(currentPeriod)
@@ -43,6 +44,7 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
   const queryClient = useQueryClient()
   const reorderEnvelopes = useReorderEnvelopes(period)
   const reorderGroups = useReorderEnvelopeGroups(period)
+  const assignEnvelope = useAssignEnvelope(period)
 
   const [overrides, setOverrides] = useState<Map<number, EnvelopeBudget>>(
     new Map()
@@ -120,6 +122,10 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
       amount,
     })
     setOverrides(updated)
+  }
+
+  async function handleAssign(envelopeId: number, newAssigned: number) {
+    await assignEnvelope.mutateAsync({ envelopeId, assigned: newAssigned })
   }
 
   function handleTargetChange(envelopeId: number, target: Envelope["target"]) {
@@ -304,7 +310,9 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-row overflow-hidden">
+      {/* Main content */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <PageHeader title="Envelopes">
         <PeriodPicker period={period} onChange={handlePeriodChange} />
       </PageHeader>
@@ -400,17 +408,22 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
         )}
       </div>
 
-      <EnvelopeDetailDialog
-        envelope={selectedItem?.envelope ?? null}
-        budget={selectedItem?.budget ?? null}
-        open={selectedEnvelopeId !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedEnvelopeId(null)
-        }}
-        donors={donors}
-        onCover={handleCover}
-        onTargetChange={handleTargetChange}
-      />
+      </div>
+
+      {/* Right detail panel — always visible */}
+      <div className="w-96 flex-shrink-0 border-l border-border bg-card">
+        <EnvelopeDetailPanel
+          envelope={selectedItem?.envelope ?? null}
+          budget={selectedItem?.budget ?? null}
+          period={period}
+          onClose={() => setSelectedEnvelopeId(null)}
+          donors={donors}
+          onCover={handleCover}
+          readyToAssign={readyToAssign}
+          allItems={currentItems}
+          onAssign={handleAssign}
+        />
+      </div>
     </div>
   )
 }

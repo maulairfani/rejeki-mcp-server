@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "envel": {
+      "type": "http",
+      "url": "http://localhost:8001/mcp",
+      "headers": {
+        "Authorization": "Bearer dev-token"
+      }
+    }
+  }
+}

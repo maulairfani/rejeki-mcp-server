@@ -9,6 +9,7 @@ from envel_platform.db import (
     get_envelope_status,
     reorder_envelope_groups,
     reorder_envelopes,
+    set_envelope_target,
 )
 
 router = APIRouter()
@@ -16,6 +17,12 @@ router = APIRouter()
 
 class AssignRequest(BaseModel):
     assigned: float
+
+
+class SetTargetRequest(BaseModel):
+    target_type: str | None = None
+    target_amount: float | None = None
+    target_deadline: str | None = None
 
 
 class EnvelopeReorderItem(BaseModel):
@@ -63,6 +70,19 @@ async def reorder_groups(
     username: str = Depends(require_user),
 ):
     reorder_envelope_groups(username, [i.model_dump() for i in body.items])
+    return {"ok": True}
+
+
+@router.patch("/{envelope_id}/target")
+async def update_target(
+    envelope_id: int,
+    body: SetTargetRequest,
+    username: str = Depends(require_user),
+):
+    set_envelope_target(
+        username, envelope_id,
+        body.target_type, body.target_amount, body.target_deadline,
+    )
     return {"ok": True}
 
 
