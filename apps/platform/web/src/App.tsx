@@ -16,6 +16,7 @@ import { SignupPage } from "@/pages/SignupPage"
 import { SignupConfirmPage } from "@/pages/SignupConfirmPage"
 import { ConnectPage } from "@/pages/ConnectPage"
 import { AddTransactionFAB } from "@/components/transactions/AddTransactionFAB"
+import { useIsMobile } from "@/hooks/useIsMobile"
 
 export default function App() {
   const { authenticated, loading } = useAuth()
@@ -54,10 +55,11 @@ export default function App() {
 function ChromedApp() {
   const { theme, setTheme } = useTheme()
   const { showNominal } = useShowNominal()
+  const isMobile = useIsMobile()
 
   return (
     <SidebarProvider>
-      <AppSidebar theme={theme} setTheme={setTheme} />
+      {!isMobile && <AppSidebar theme={theme} setTheme={setTheme} />}
       <SidebarInset className="flex flex-col overflow-hidden">
         <Routes>
           <Route path="/envelopes" element={<EnvelopesPage showNominal={showNominal} />} />

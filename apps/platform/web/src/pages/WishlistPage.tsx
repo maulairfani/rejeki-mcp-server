@@ -7,7 +7,6 @@ import {
   type WishlistSort,
 } from "@/hooks/useWishlist"
 import { PageHeader } from "@/components/shared/PageHeader"
-import { Badge } from "@/components/shared/Badge"
 import { WishlistRow } from "@/components/wishlist/WishlistRow"
 import { WishlistFilters } from "@/components/wishlist/WishlistFilters"
 import { WishlistDetailPanel } from "@/components/wishlist/WishlistDetailPanel"
@@ -50,19 +49,7 @@ export function WishlistPage({ showNominal }: { showNominal: boolean }) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <PageHeader
-        title="Wishlist"
-        right={
-          <div className="flex items-center gap-2">
-            <Badge color="muted" size="xs">
-              {wantedCount} wanted
-            </Badge>
-            <Badge color="brand" size="xs">
-              {boughtCount} bought
-            </Badge>
-          </div>
-        }
-      />
+      <PageHeader title="Wishlist" />
 
       <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
         {/* Left: list */}

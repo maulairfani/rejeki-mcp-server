@@ -38,10 +38,29 @@ import { EnvelopeDetailPanel } from "@/components/envelopes/EnvelopeDetailPanel"
 export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
   const [period, setPeriod] = useState(currentPeriod)
   const [includeArchived, setIncludeArchived] = useState(false)
-  const { groups: initialGroups, allEnvelopes, isLoading } = useEnvelopes(
+  // Always fetch all envelopes so we can detect whether any archived ones exist
+  // and toggle the "Show archived" button accordingly. Filtering happens client-side.
+  const { groups: rawGroups, allEnvelopes: rawAll, isLoading } = useEnvelopes(
     period,
-    { includeArchived }
+    { includeArchived: true }
   )
+  const hasArchived = useMemo(
+    () => rawAll.some((i) => i.envelope.archived),
+    [rawAll]
+  )
+  const allEnvelopes = useMemo(
+    () => (includeArchived ? rawAll : rawAll.filter((i) => !i.envelope.archived)),
+    [rawAll, includeArchived]
+  )
+  const initialGroups = useMemo(() => {
+    if (includeArchived) return rawGroups
+    return rawGroups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((i) => !i.envelope.archived),
+      }))
+      .filter((g) => g.items.length > 0)
+  }, [rawGroups, includeArchived])
   const { totalBalance } = useAccounts()
   const queryClient = useQueryClient()
   const reorderEnvelopes = useReorderEnvelopes(period)
@@ -93,9 +112,16 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
     [allEnvelopes, overrides, targetOverrides]
   )
 
+  // Sum across ALL envelopes — including archived ones — so archiving an
+  // envelope doesn't appear to "release" its balance back to Ready-to-Assign.
+  // Archived envelopes still hold their available money; the UI just hides them.
   const totalAvailable = useMemo(
-    () => currentItems.reduce((s, i) => s + i.budget.available, 0),
-    [currentItems]
+    () =>
+      rawAll.reduce(
+        (s, i) => s + (overrides.get(i.envelope.id) ?? i.budget).available,
+        0
+      ),
+    [rawAll, overrides]
   )
   const isPastPeriod = period < currentPeriod()
   const readyToAssign = totalBalance - totalAvailable
@@ -358,7 +384,7 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
         </div>
       )}
 
-      <div className="flex flex-shrink-0 items-center border-b border-border bg-card px-7 py-3">
+      <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-7 py-3">
         <div>
           <p className="mb-0.5 text-[11px] font-medium text-text-muted">
             Total available
@@ -370,6 +396,19 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
             tone={totalAvailable < 0 ? "auto" : "neutral"}
           />
         </div>
+        {hasArchived && (
+          <button
+            onClick={() => setIncludeArchived((v) => !v)}
+            aria-pressed={includeArchived}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-colors md:hidden ${
+              includeArchived
+                ? "bg-brand-light text-brand-text"
+                : "bg-bg-muted text-text-secondary"
+            }`}
+          >
+            {includeArchived ? "Hide archived" : "Show archived"}
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -406,18 +445,20 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
 
       </div> {/* end left column */}
 
-      {/* Floating archived toggle — fixed, bottom-center */}
-      <button
-        onClick={() => setIncludeArchived((v) => !v)}
-        aria-pressed={includeArchived}
-        className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full px-4 py-2 text-[12px] font-semibold shadow-lg transition-all hover:scale-105 active:scale-95 ${
-          includeArchived
-            ? "bg-brand-light text-brand-text"
-            : "bg-card text-text-secondary border border-border"
-        }`}
-      >
-        {includeArchived ? "Hide archived" : "Show archived"}
-      </button>
+      {/* Floating archived toggle — desktop only, bottom-center */}
+      {hasArchived && (
+        <button
+          onClick={() => setIncludeArchived((v) => !v)}
+          aria-pressed={includeArchived}
+          className={`fixed bottom-6 left-1/2 z-50 hidden -translate-x-1/2 rounded-full px-4 py-2 text-[12px] font-semibold shadow-lg transition-all hover:scale-105 active:scale-95 md:block ${
+            includeArchived
+              ? "bg-brand-light text-brand-text"
+              : "bg-card text-text-secondary border border-border"
+          }`}
+        >
+          {includeArchived ? "Hide archived" : "Show archived"}
+        </button>
+      )}
 
       {/* Desktop right panel */}
       <div className="hidden w-96 flex-shrink-0 flex-col border-l border-border bg-card md:flex">

@@ -58,8 +58,19 @@ export function WishlistFilters({
   resultCount,
 }: WishlistFiltersProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2.5">
-      <div className="flex gap-1.5">
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="relative w-full max-w-[320px] flex-1 min-w-[200px]">
+        <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-muted" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search wishlist…"
+          className="h-9 w-full rounded-md border border-border bg-bg px-3 pl-9 text-[13.5px] text-text-primary placeholder:text-text-placeholder focus:border-brand focus:outline-none"
+        />
+      </div>
+
+      <div className="flex gap-1.5" role="group" aria-label="Filter by status">
         {FILTER_OPTIONS.map((opt) => (
           <Chip
             key={opt.value}
@@ -74,7 +85,7 @@ export function WishlistFilters({
       <select
         value={sort}
         onChange={(e) => onSortChange(e.target.value as WishlistSort)}
-        className="h-7 rounded-md border border-border bg-bg px-2 text-xs font-semibold text-text-secondary focus:border-brand focus:outline-none"
+        className="h-7 rounded-md border border-border bg-bg px-2 text-xs text-text-secondary focus:border-brand focus:outline-none"
       >
         {SORT_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -86,17 +97,6 @@ export function WishlistFilters({
       <span className="text-xs font-medium text-text-muted">
         {resultCount} item{resultCount !== 1 ? "s" : ""}
       </span>
-
-      <div className="relative ml-auto w-56 max-w-full">
-        <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-text-muted" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search wishlist…"
-          className="h-8 w-full rounded-md border border-border bg-bg pl-8 pr-3 text-[13px] text-text-primary placeholder:text-text-placeholder focus:border-brand focus:outline-none"
-        />
-      </div>
     </div>
   )
 }

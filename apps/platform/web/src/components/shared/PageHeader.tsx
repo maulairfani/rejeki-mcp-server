@@ -17,8 +17,8 @@ export function PageHeader({ title, children, right, hideAmountsBadge }: PageHea
   return (
     <div className="flex h-[60px] flex-shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3 sm:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-        <SidebarTrigger className="-ml-1 flex-shrink-0 text-text-muted" />
-        <Separator orientation="vertical" className="flex-shrink-0 data-[orientation=vertical]:h-4" />
+        <SidebarTrigger className="-ml-1 hidden flex-shrink-0 text-text-muted md:inline-flex" />
+        <Separator orientation="vertical" className="hidden flex-shrink-0 data-[orientation=vertical]:h-4 md:block" />
         <span
           className={
             children

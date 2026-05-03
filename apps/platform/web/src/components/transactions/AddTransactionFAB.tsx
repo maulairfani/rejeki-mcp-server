@@ -1,6 +1,18 @@
 import { useState, type ComponentType } from "react"
-import { useLocation } from "react-router-dom"
-import { Check, Loader2, Plus, X } from "lucide-react"
+import { Link, useLocation } from "react-router-dom"
+import {
+  Check,
+  CreditCard,
+  Heart,
+  LayoutDashboard,
+  List,
+  Loader2,
+  Plus,
+  Settings,
+  Wallet,
+  X,
+} from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { useCreateTransaction, type TransactionType } from "@/hooks/useTransactions"
 import { useTags, useUpdateTransactionTags } from "@/hooks/useTags"
 import { useAccounts } from "@/hooks/useAccounts"
@@ -20,9 +32,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { AddEnvelopeForm } from "@/components/envelopes/AddEnvelopeForm"
 import { AddAccountForm } from "@/components/accounts/AddAccountForm"
 import { AddWishlistForm } from "@/components/wishlist/AddWishlistForm"
+
+const NAV_ITEMS: { title: string; url: string; icon: LucideIcon }[] = [
+  { title: "Envelopes", url: "/envelopes", icon: Wallet },
+  { title: "Transactions", url: "/transactions", icon: List },
+  { title: "Analytics", url: "/analytics", icon: LayoutDashboard },
+  { title: "Accounts", url: "/accounts", icon: CreditCard },
+  { title: "Wishlist", url: "/wishlist", icon: Heart },
+  { title: "Settings", url: "/settings", icon: Settings },
+]
 
 const TYPES: { value: TransactionType; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -70,58 +96,121 @@ const FAB_BY_ROUTE: Record<string, FabConfig> = {
 }
 
 export function AddTransactionFAB() {
-  const [open, setOpen] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
+  const [hubOpen, setHubOpen] = useState(false)
   const isMobile = useIsMobile()
   const location = useLocation()
   const config = FAB_BY_ROUTE[location.pathname]
 
-  if (!config) return null
-  const { label, title, Form, hasRightPanel } = config
+  // Desktop: hide if the current page has no create flow
+  if (!isMobile && !config) return null
 
-  // On desktop with a right panel, push FAB left of the 24rem (w-96) panel.
-  const desktopRightOffset = hasRightPanel ? "md:right-[26rem]" : "md:right-6"
+  const desktopRightOffset = config?.hasRightPanel
+    ? "md:right-[26rem]"
+    : "md:right-6"
 
+  // Mobile FAB is always-on hub: tap to expand into nav + (optional) primary action.
+  if (isMobile) {
+    return (
+      <>
+        <Popover open={hubOpen} onOpenChange={setHubOpen}>
+          <PopoverTrigger
+            render={
+              <button
+                aria-label={config ? config.label : "Navigate"}
+                className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-brand-text text-white shadow-lg transition-transform active:scale-95"
+              />
+            }
+          >
+            {hubOpen ? <X className="size-6" /> : <Plus className="size-6" />}
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            align="end"
+            sideOffset={10}
+            className="w-60 gap-1 p-2"
+          >
+            {NAV_ITEMS.map((item) => {
+              const isActive = location.pathname === item.url
+              return (
+                <Link
+                  key={item.url}
+                  to={item.url}
+                  onClick={() => setHubOpen(false)}
+                  className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors ${
+                    isActive
+                      ? "bg-brand-light text-brand-text"
+                      : "text-text-secondary hover:bg-bg-muted"
+                  }`}
+                >
+                  <item.icon className="size-4" />
+                  {item.title}
+                </Link>
+              )
+            })}
+            {config && (
+              <>
+                <div className="my-1 h-px bg-border" />
+                <button
+                  onClick={() => {
+                    setHubOpen(false)
+                    setFormOpen(true)
+                  }}
+                  className="flex items-center gap-2 rounded-md bg-brand-text px-3 py-2.5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:opacity-90"
+                >
+                  <Plus className="size-4" />
+                  {config.label}
+                </button>
+              </>
+            )}
+          </PopoverContent>
+        </Popover>
+
+        {config && (
+          <Sheet open={formOpen} onOpenChange={setFormOpen}>
+            <SheetContent
+              side="bottom"
+              className="flex max-h-[90svh] flex-col rounded-t-2xl px-0 pb-0"
+              showCloseButton={false}
+            >
+              <SheetHeader className="px-5 pb-1 pt-5">
+                <div className="flex justify-center pb-1">
+                  <div className="h-1 w-10 rounded-full bg-border" />
+                </div>
+                <SheetTitle className="text-[15px]">{config.title}</SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto px-5 pb-8">
+                <config.Form onSuccess={() => setFormOpen(false)} />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
+      </>
+    )
+  }
+
+  // Desktop: existing pill FAB → directly opens form dialog
+  const { label, title, Form } = config!
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => setFormOpen(true)}
         className={`fixed bottom-6 right-6 ${desktopRightOffset} z-50 flex h-14 items-center gap-2 rounded-full bg-brand-text px-5 text-white shadow-lg transition-transform hover:scale-105 active:scale-95`}
         aria-label={label}
       >
         <Plus className="size-5" />
         <span className="text-[13.5px] font-semibold">{label}</span>
       </button>
-
-      {isMobile ? (
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetContent
-            side="bottom"
-            className="flex max-h-[90svh] flex-col rounded-t-2xl px-0 pb-0"
-            showCloseButton={false}
-          >
-            <SheetHeader className="px-5 pb-1 pt-5">
-              <div className="flex justify-center pb-1">
-                <div className="h-1 w-10 rounded-full bg-border" />
-              </div>
-              <SheetTitle className="text-[15px]">{title}</SheetTitle>
-            </SheetHeader>
-            <div className="flex-1 overflow-y-auto px-5 pb-8">
-              <Form onSuccess={() => setOpen(false)} />
-            </div>
-          </SheetContent>
-        </Sheet>
-      ) : (
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="flex max-h-[85vh] flex-col gap-0 p-0 sm:max-w-[440px]">
-            <DialogHeader className="border-b border-border px-5 py-4">
-              <DialogTitle className="text-[15px]">{title}</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto px-5 pb-6">
-              <Form onSuccess={() => setOpen(false)} />
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 p-0 sm:max-w-[440px]">
+          <DialogHeader className="border-b border-border px-5 py-4">
+            <DialogTitle className="text-[15px]">{title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-5 pb-6">
+            <Form onSuccess={() => setFormOpen(false)} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
