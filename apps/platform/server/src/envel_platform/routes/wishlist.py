@@ -1,9 +1,19 @@
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
 from envel_platform.auth import require_user
-from envel_platform.db import get_wishlist
+from envel_platform.db import add_wishlist_item, get_wishlist
 
 router = APIRouter()
+
+
+class WishlistCreate(BaseModel):
+    name: str
+    icon: str | None = None
+    price: float | None = None
+    priority: str = "medium"
+    url: str | None = None
+    notes: str | None = None
 
 
 @router.get("")
@@ -23,3 +33,19 @@ async def wishlist(
         "wantedCount": wanted_count,
         "boughtCount": bought_count,
     }
+
+
+@router.post("", status_code=201)
+async def create_wishlist_item(
+    body: WishlistCreate,
+    username: str = Depends(require_user),
+):
+    return add_wishlist_item(
+        username,
+        body.name,
+        body.icon,
+        body.price,
+        body.priority,
+        body.url,
+        body.notes,
+    )

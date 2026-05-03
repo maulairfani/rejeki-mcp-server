@@ -93,22 +93,20 @@ export function TransactionsPage({ showNominal }: { showNominal: boolean }) {
         <PeriodPicker period={period} onChange={setPeriod} />
       </PageHeader>
 
-      {/* Filter bar */}
-      <div className="flex-shrink-0 border-b border-border bg-card px-7 py-3">
-        <TransactionFilters
-          filters={filters}
-          onChange={setFilters}
-          accounts={accounts}
-          envelopes={envelopes}
-          tags={tagNames}
-          resultCount={filtered.length}
-        />
-      </div>
-
       {/* Main content + right panel */}
       <div className="flex flex-1 flex-row overflow-hidden">
         {/* Left: list */}
         <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Filter bar */}
+          <div className="flex-shrink-0 border-b border-border bg-card px-7 py-3">
+            <TransactionFilters
+              filters={filters}
+              onChange={setFilters}
+              accounts={accounts}
+              envelopes={envelopes}
+              tags={tagNames}
+            />
+          </div>
           {/* Column header strip */}
           <div className="hidden flex-shrink-0 grid-cols-[28px_1fr_1fr_100px_80px_90px] gap-3 border-b border-border bg-bg-muted px-7 py-1.5 md:grid">
             {["", "Payee", "Memo", "Envelope", "Account", "Amount"].map((h, i) => (

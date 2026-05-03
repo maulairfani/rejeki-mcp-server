@@ -22,7 +22,6 @@ interface TransactionFiltersProps {
   accounts: string[]
   envelopes: string[]
   tags: string[]
-  resultCount: number
 }
 
 function Chip({
@@ -55,7 +54,6 @@ export function TransactionFilters({
   accounts,
   envelopes,
   tags,
-  resultCount,
 }: TransactionFiltersProps) {
   const hasActiveFilters =
     filters.type !== "all" ||
@@ -151,9 +149,7 @@ export function TransactionFilters({
         </button>
       )}
 
-      <span className="ml-auto text-xs font-medium text-text-muted tabular-nums">
-        {resultCount} transactions
-      </span>
+
     </div>
   )
 }

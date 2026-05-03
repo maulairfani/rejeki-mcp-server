@@ -413,6 +413,102 @@ def set_envelope_target(
         conn.commit()
 
 
+def add_envelope(
+    username: str,
+    name: str,
+    icon: str,
+    type_: str,
+    group_id: int | None,
+) -> dict:
+    with get_conn(username) as conn:
+        next_sort = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 AS s FROM envelopes WHERE COALESCE(group_id, -1) = COALESCE(?, -1)",
+            (group_id,),
+        ).fetchone()["s"]
+        cur = conn.execute(
+            """INSERT INTO envelopes (name, icon, type, group_id, sort_order)
+               VALUES (?, ?, ?, ?, ?)""",
+            (name, icon or "📦", type_, group_id, next_sort),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, name, icon, type, group_id FROM envelopes WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
+
+
+def add_wishlist_item(
+    username: str,
+    name: str,
+    icon: str | None,
+    price: float | None,
+    priority: str,
+    url: str | None,
+    notes: str | None,
+) -> dict:
+    with get_conn(username) as conn:
+        cur = conn.execute(
+            """INSERT INTO wishlist (name, icon, price, priority, url, notes)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (name, icon or "🎁", price, priority, url, notes),
+        )
+        conn.commit()
+        row = conn.execute(
+            """SELECT id, name, icon, price, priority, url, notes, status,
+                      created_at AS createdAt
+               FROM wishlist WHERE id = ?""",
+            (cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
+
+
+def archive_envelope(username: str, envelope_id: int) -> None:
+    with get_conn(username) as conn:
+        conn.execute("UPDATE envelopes SET archived = 1 WHERE id = ?", (envelope_id,))
+        conn.execute(
+            "UPDATE scheduled_transactions SET is_active = 0 WHERE envelope_id = ? AND is_active = 1",
+            (envelope_id,),
+        )
+        conn.commit()
+
+
+def unarchive_envelope(username: str, envelope_id: int) -> None:
+    with get_conn(username) as conn:
+        conn.execute("UPDATE envelopes SET archived = 0 WHERE id = ?", (envelope_id,))
+        conn.commit()
+
+
+def delete_envelope(username: str, envelope_id: int) -> dict:
+    with get_conn(username) as conn:
+        env = conn.execute(
+            "SELECT name FROM envelopes WHERE id = ?", (envelope_id,)
+        ).fetchone()
+        if not env:
+            raise ValueError(f"Envelope id={envelope_id} not found")
+
+        tx_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM transactions WHERE envelope_id = ?",
+            (envelope_id,),
+        ).fetchone()["n"]
+        sched_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM scheduled_transactions WHERE envelope_id = ?",
+            (envelope_id,),
+        ).fetchone()["n"]
+
+        if tx_count > 0 or sched_count > 0:
+            raise ValueError(
+                f"Cannot delete '{env['name']}': {tx_count} transaction(s) and "
+                f"{sched_count} scheduled transaction(s) still reference it. "
+                f"Archive instead to keep history."
+            )
+
+        conn.execute("DELETE FROM budget_periods WHERE envelope_id = ?", (envelope_id,))
+        conn.execute("DELETE FROM envelopes WHERE id = ?", (envelope_id,))
+        conn.commit()
+        return {"deleted_id": envelope_id, "name": env["name"]}
+
+
 def assign_envelope(username: str, envelope_id: int, period: str, assigned: float) -> None:
     sql = """
         INSERT INTO budget_periods (envelope_id, period, assigned, carryover)

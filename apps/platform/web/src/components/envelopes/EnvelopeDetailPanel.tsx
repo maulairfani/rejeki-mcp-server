@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react"
-import { Check, CheckCircle2, Loader2, X } from "lucide-react"
+import { Archive, ArchiveRestore, Check, CheckCircle2, Loader2, Trash2, X } from "lucide-react"
 import { formatIDR } from "@/lib/format"
 import {
+  useArchiveEnvelope,
   useAssignEnvelope,
+  useDeleteEnvelope,
   useSetEnvelopeTarget,
   type Envelope,
   type EnvelopeBudget,
@@ -140,6 +142,132 @@ export function EnvelopeDetailPanel({
           period={period}
           isPastPeriod={isPastPeriod}
         />
+
+        {/* Danger zone */}
+        <DangerZone
+          key={`danger-${envelope.id}`}
+          envelope={envelope}
+          period={period}
+          onDeleted={onClose}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ── Danger zone (archive + delete) ───────────────────────────────────────────
+
+function DangerZone({
+  envelope,
+  period,
+  onDeleted,
+}: {
+  envelope: Envelope
+  period: string
+  onDeleted: () => void
+}) {
+  const archiveMutation = useArchiveEnvelope(period)
+  const deleteMutation = useDeleteEnvelope(period)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setConfirmDelete(false)
+    setDeleteError(null)
+  }, [envelope.id])
+
+  const isArchiving = archiveMutation.status === "pending"
+  const isDeleting = deleteMutation.status === "pending"
+
+  async function handleArchive() {
+    if (isArchiving) return
+    await archiveMutation.mutateAsync({
+      envelopeId: envelope.id,
+      archive: !envelope.archived,
+    })
+  }
+
+  async function handleDelete() {
+    if (isDeleting) return
+    setDeleteError(null)
+    try {
+      await deleteMutation.mutateAsync(envelope.id)
+      onDeleted()
+    } catch (e) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : "Cannot delete — transactions still reference this envelope."
+      setDeleteError(msg)
+      setConfirmDelete(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-border px-4 py-4">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+        Manage
+      </p>
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={handleArchive}
+          disabled={isArchiving}
+          className="flex items-center justify-center gap-1.5 rounded-lg bg-bg-muted py-2 text-[12px] font-semibold text-text-secondary transition-colors hover:brightness-95 disabled:opacity-50"
+        >
+          {isArchiving ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : envelope.archived ? (
+            <><ArchiveRestore className="size-3.5" /> Unarchive</>
+          ) : (
+            <><Archive className="size-3.5" /> Archive</>
+          )}
+        </button>
+
+        {!confirmDelete ? (
+          <button
+            onClick={() => {
+              setDeleteError(null)
+              setConfirmDelete(true)
+            }}
+            className="flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold text-[color:var(--danger)] transition-colors hover:bg-danger-light"
+          >
+            <Trash2 className="size-3.5" /> Delete
+          </button>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-lg border border-[color:var(--danger)]/30 bg-danger-light p-2.5">
+            <p className="text-[12px] text-text-secondary">
+              Delete <span className="font-semibold">{envelope.name}</span>? Only works
+              if no transactions reference it.
+            </p>
+            <p className="text-[11.5px] font-semibold text-[color:var(--danger)]">
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={isDeleting}
+                className="flex-1 rounded-md bg-bg-muted py-1.5 text-[11.5px] font-semibold text-text-secondary hover:brightness-95 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-[color:var(--danger)] py-1.5 text-[11.5px] font-semibold text-white hover:brightness-95 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {deleteError && (
+          <p className="text-[11.5px] text-[color:var(--danger)]">{deleteError}</p>
+        )}
       </div>
     </div>
   )
@@ -303,7 +431,7 @@ function EditForm({
 
 function HistoricalEmptyState() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-12 text-center">
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-bg-muted">
         <span className="text-xl">🗓️</span>
       </div>
@@ -380,6 +508,7 @@ function EmptyState({
     </div>
   )
 }
+
 
 // ── Zero state ────────────────────────────────────────────────────────────────
 

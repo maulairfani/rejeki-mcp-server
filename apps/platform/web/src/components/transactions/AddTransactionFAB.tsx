@@ -1,9 +1,11 @@
-import { useState } from "react"
+import { useState, type ComponentType } from "react"
+import { useLocation } from "react-router-dom"
 import { Check, Loader2, Plus, X } from "lucide-react"
 import { useCreateTransaction, type TransactionType } from "@/hooks/useTransactions"
 import { useTags, useUpdateTransactionTags } from "@/hooks/useTags"
 import { useAccounts } from "@/hooks/useAccounts"
 import { useEnvelopes } from "@/hooks/useEnvelopes"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import { currentPeriod } from "@/components/shared/PeriodPicker"
 import { Input } from "@/components/ui/input"
 import {
@@ -12,6 +14,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { AddEnvelopeForm } from "@/components/envelopes/AddEnvelopeForm"
+import { AddAccountForm } from "@/components/accounts/AddAccountForm"
+import { AddWishlistForm } from "@/components/wishlist/AddWishlistForm"
 
 const TYPES: { value: TransactionType; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -23,36 +34,94 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
+// Per-route FAB config. `hasRightPanel` shifts the button to clear a 24rem panel on desktop.
+type FabConfig = {
+  label: string
+  title: string
+  Form: ComponentType<{ onSuccess: () => void }>
+  hasRightPanel: boolean
+}
+
+const FAB_BY_ROUTE: Record<string, FabConfig> = {
+  "/transactions": {
+    label: "New transaction",
+    title: "Add transaction",
+    Form: AddTransactionForm,
+    hasRightPanel: true,
+  },
+  "/envelopes": {
+    label: "New envelope",
+    title: "Add envelope",
+    Form: AddEnvelopeForm,
+    hasRightPanel: true,
+  },
+  "/accounts": {
+    label: "New account",
+    title: "Add account",
+    Form: AddAccountForm,
+    hasRightPanel: true,
+  },
+  "/wishlist": {
+    label: "New wishlist item",
+    title: "Add wishlist item",
+    Form: AddWishlistForm,
+    hasRightPanel: false,
+  },
+}
+
 export function AddTransactionFAB() {
   const [open, setOpen] = useState(false)
+  const isMobile = useIsMobile()
+  const location = useLocation()
+  const config = FAB_BY_ROUTE[location.pathname]
+
+  if (!config) return null
+  const { label, title, Form, hasRightPanel } = config
+
+  // On desktop with a right panel, push FAB left of the 24rem (w-96) panel.
+  const desktopRightOffset = hasRightPanel ? "md:right-[26rem]" : "md:right-6"
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-brand-text text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
-        aria-label="Add transaction"
+        className={`fixed bottom-6 right-6 ${desktopRightOffset} z-50 flex h-14 items-center gap-2 rounded-full bg-brand-text px-5 text-white shadow-lg transition-transform hover:scale-105 active:scale-95`}
+        aria-label={label}
       >
-        <Plus className="size-6" />
+        <Plus className="size-5" />
+        <span className="text-[13.5px] font-semibold">{label}</span>
       </button>
 
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent
-          side="bottom"
-          className="flex max-h-[90svh] flex-col rounded-t-2xl px-0 pb-0"
-          showCloseButton={false}
-        >
-          <SheetHeader className="px-5 pb-1 pt-5">
-            <div className="flex justify-center pb-1">
-              <div className="h-1 w-10 rounded-full bg-border" />
+      {isMobile ? (
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent
+            side="bottom"
+            className="flex max-h-[90svh] flex-col rounded-t-2xl px-0 pb-0"
+            showCloseButton={false}
+          >
+            <SheetHeader className="px-5 pb-1 pt-5">
+              <div className="flex justify-center pb-1">
+                <div className="h-1 w-10 rounded-full bg-border" />
+              </div>
+              <SheetTitle className="text-[15px]">{title}</SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto px-5 pb-8">
+              <Form onSuccess={() => setOpen(false)} />
             </div>
-            <SheetTitle className="text-[15px]">Add transaction</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-5 pb-8">
-            <AddTransactionForm onSuccess={() => setOpen(false)} />
-          </div>
-        </SheetContent>
-      </Sheet>
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="flex max-h-[85vh] flex-col gap-0 p-0 sm:max-w-[440px]">
+            <DialogHeader className="border-b border-border px-5 py-4">
+              <DialogTitle className="text-[15px]">{title}</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-5 pb-6">
+              <Form onSuccess={() => setOpen(false)} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 
 export type Priority = "high" | "medium" | "low"
@@ -91,4 +91,25 @@ export function useWishlist() {
     isLoading,
     error,
   }
+}
+
+export function useCreateWishlistItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: {
+      name: string
+      icon?: string
+      price?: number | null
+      priority?: Priority
+      url?: string | null
+      notes?: string | null
+    }) =>
+      api("/api/wishlist", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wishlist"] })
+    },
+  })
 }

@@ -244,6 +244,54 @@ export function useAssignEnvelope(period: string) {
   })
 }
 
+// ── Create envelope ────────────────────────────────────
+
+export function useCreateEnvelope(period: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: {
+      name: string
+      icon?: string
+      type?: "income" | "expense"
+      group_id?: number | null
+    }) =>
+      api("/api/envelopes", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["envelopes", period] })
+    },
+  })
+}
+
+// ── Archive / unarchive / delete mutations ─────────────
+
+export function useArchiveEnvelope(period: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ envelopeId, archive }: { envelopeId: number; archive: boolean }) =>
+      api(`/api/envelopes/${envelopeId}/${archive ? "archive" : "unarchive"}`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["envelopes", period] })
+    },
+  })
+}
+
+export function useDeleteEnvelope(period: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (envelopeId: number) =>
+      api(`/api/envelopes/${envelopeId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["envelopes", period] })
+      queryClient.invalidateQueries({ queryKey: ["transactions"] })
+    },
+  })
+}
+
 // ── Cover overspent helper ──────────────────────────────
 
 export interface CoverAction {

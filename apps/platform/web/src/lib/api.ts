@@ -23,5 +23,7 @@ export async function api<T>(
     throw new Error(body?.detail ?? `Request failed: ${res.status}`)
   }
 
-  return res.json()
+  if (res.status === 204) return undefined as T
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }

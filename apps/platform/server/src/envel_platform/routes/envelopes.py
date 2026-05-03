@@ -1,18 +1,29 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from envel_platform.auth import require_user
 from envel_platform.db import (
+    add_envelope,
+    archive_envelope,
     assign_envelope,
+    delete_envelope,
     get_envelope_status,
     reorder_envelope_groups,
     reorder_envelopes,
     set_envelope_target,
+    unarchive_envelope,
 )
 
 router = APIRouter()
+
+
+class EnvelopeCreate(BaseModel):
+    name: str
+    icon: str | None = None
+    type: str = "expense"
+    group_id: int | None = None
 
 
 class AssignRequest(BaseModel):
@@ -55,6 +66,14 @@ async def envelopes(
     return get_envelope_status(username, period, include_archived)
 
 
+@router.post("", status_code=201)
+async def create_envelope(
+    body: EnvelopeCreate,
+    username: str = Depends(require_user),
+):
+    return add_envelope(username, body.name, body.icon or "📦", body.type, body.group_id)
+
+
 @router.patch("/reorder")
 async def reorder(
     body: ReorderRequest,
@@ -95,3 +114,23 @@ async def assign(
 ):
     assign_envelope(username, envelope_id, period, body.assigned)
     return {"ok": True}
+
+
+@router.post("/{envelope_id}/archive")
+async def archive(envelope_id: int, username: str = Depends(require_user)):
+    archive_envelope(username, envelope_id)
+    return {"ok": True}
+
+
+@router.post("/{envelope_id}/unarchive")
+async def unarchive(envelope_id: int, username: str = Depends(require_user)):
+    unarchive_envelope(username, envelope_id)
+    return {"ok": True}
+
+
+@router.delete("/{envelope_id}", status_code=204)
+async def remove_envelope(envelope_id: int, username: str = Depends(require_user)):
+    try:
+        delete_envelope(username, envelope_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
