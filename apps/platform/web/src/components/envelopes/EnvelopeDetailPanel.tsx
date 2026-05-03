@@ -97,16 +97,6 @@ export function EnvelopeDetailPanel({
           </div>
         </div>
 
-        {/* Assign — only for current/future periods */}
-        {!isPastPeriod && (
-          <AssignSection
-            key={`assign-${envelope.id}`}
-            envelopeId={envelope.id}
-            budget={budget}
-            period={period}
-          />
-        )}
-
         {/* Cover overspent */}
         {overspent && (
           <div className="border-t border-border px-4 py-4">
@@ -142,46 +132,68 @@ export function EnvelopeDetailPanel({
           </div>
         )}
 
-        {/* Target */}
-        <TargetEditor
-          key={`target-${envelope.id}`}
+        {/* Combined assign + target form */}
+        <EditForm
+          key={`edit-${envelope.id}`}
           envelope={envelope}
+          budget={budget}
           period={period}
+          isPastPeriod={isPastPeriod}
         />
       </div>
     </div>
   )
 }
 
-// ── Assign section ────────────────────────────────────────────────────────────
+// ── Combined edit form (assign + target) ─────────────────────────────────────
 
-function AssignSection({
-  envelopeId,
+function EditForm({
+  envelope,
   budget,
   period,
+  isPastPeriod,
 }: {
-  envelopeId: number
+  envelope: Envelope
   budget: EnvelopeBudget
   period: string
+  isPastPeriod: boolean
 }) {
-  const mutation = useAssignEnvelope(period)
-  const [raw, setRaw] = useState(String(budget.assigned))
+  const assignMutation = useAssignEnvelope(period)
+  const targetMutation = useSetEnvelopeTarget(period)
+
+  const [assignRaw, setAssignRaw] = useState(String(budget.assigned))
+  const [targetType, setTargetType] = useState<TargetType | "none">(
+    envelope.target?.type ?? "none"
+  )
+  const [amount, setAmount] = useState(envelope.target?.amount?.toString() ?? "")
+  const [deadline, setDeadline] = useState(envelope.target?.deadline ?? "")
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
 
   useEffect(() => {
-    setRaw(String(budget.assigned))
+    setAssignRaw(String(budget.assigned))
+    setTargetType(envelope.target?.type ?? "none")
+    setAmount(envelope.target?.amount?.toString() ?? "")
+    setDeadline(envelope.target?.deadline ?? "")
     setStatus("idle")
-  }, [envelopeId, budget.assigned])
+  }, [envelope.id])
 
-  const amount = Math.max(0, Number(raw) || 0)
   const isPending = status === "loading"
-  const unchanged = amount === budget.assigned
+  const newAssigned = Math.max(0, Number(assignRaw) || 0)
+  const assignChanged = !isPastPeriod && newAssigned !== budget.assigned
 
   async function handleSave() {
-    if (isPending || unchanged) return
+    if (isPending) return
     setStatus("loading")
     try {
-      await mutation.mutateAsync({ envelopeId, assigned: amount })
+      if (assignChanged) {
+        await assignMutation.mutateAsync({ envelopeId: envelope.id, assigned: newAssigned })
+      }
+      await targetMutation.mutateAsync({
+        envelopeId: envelope.id,
+        targetType: targetType === "none" ? null : targetType,
+        targetAmount: targetType !== "none" ? Number(amount) || 0 : null,
+        targetDeadline: targetType === "needed_by_date" ? deadline || null : null,
+      })
       setStatus("success")
       setTimeout(() => setStatus("idle"), 1500)
     } catch {
@@ -192,36 +204,92 @@ function AssignSection({
 
   return (
     <div className="border-t border-border px-4 py-4">
-      <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-        Assign
-      </p>
-      <div className="flex gap-2">
-        <input
-          type="number"
-          value={raw}
-          onChange={(e) => setRaw(e.target.value)}
-          disabled={isPending}
-          className="h-8 flex-1 rounded-lg border border-border bg-bg-muted px-2 text-[12.5px] tabular-nums text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
-        />
+      <div className="flex flex-col gap-4">
+        {/* Assign input */}
+        {!isPastPeriod && (
+          <div>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+              Assign
+            </p>
+            <input
+              type="number"
+              value={assignRaw}
+              onChange={(e) => setAssignRaw(e.target.value)}
+              disabled={isPending}
+              className="h-8 w-full rounded-lg border border-border bg-bg-muted px-2 text-[12.5px] tabular-nums text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+            />
+          </div>
+        )}
+
+        {/* Target inputs */}
+        <div>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            Target
+          </p>
+          <div className="flex flex-col gap-2">
+            <select
+              value={targetType}
+              onChange={(e) => setTargetType(e.target.value as TargetType | "none")}
+              disabled={isPending}
+              className="h-8 rounded-lg border border-border bg-bg-muted px-2 text-[12.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+            >
+              {TARGET_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            {targetType !== "none" && (
+              <>
+                <div>
+                  <label className="text-[11px] text-text-muted">Amount (IDR)</label>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    disabled={isPending}
+                    placeholder="0"
+                    className="mt-0.5 h-8 w-full rounded-lg border border-border bg-bg-muted px-2 text-[12.5px] tabular-nums text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+                  />
+                </div>
+                {targetType === "needed_by_date" && (
+                  <div>
+                    <label className="text-[11px] text-text-muted">Deadline</label>
+                    <input
+                      type="date"
+                      value={deadline}
+                      onChange={(e) => setDeadline(e.target.value)}
+                      disabled={isPending}
+                      className="mt-0.5 h-8 w-full rounded-lg border border-border bg-bg-muted px-2 text-[12.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Single save button */}
         <button
           onClick={handleSave}
-          disabled={isPending || unchanged}
-          className={`flex min-w-[64px] items-center justify-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold transition-colors ${
+          disabled={isPending}
+          className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition-colors ${
             status === "success"
               ? "bg-[color:var(--success-light)] text-[color:var(--success)]"
               : status === "error"
                 ? "bg-danger-light text-[color:var(--danger)]"
-                : isPending || unchanged
+                : isPending
                   ? "cursor-not-allowed bg-bg-muted text-text-muted"
                   : "bg-brand-light text-brand-text hover:brightness-95"
           }`}
         >
           {status === "loading" ? (
-            <Loader2 className="size-3.5 animate-spin" />
+            <><Loader2 className="size-3.5 animate-spin" /> Saving…</>
           ) : status === "success" ? (
             <><Check className="size-3.5" /> Saved</>
           ) : status === "error" ? (
-            "Error"
+            "Failed — try again"
           ) : (
             "Save"
           )}
@@ -639,112 +707,3 @@ function BudgetLine({
   )
 }
 
-function TargetEditor({
-  envelope,
-  period,
-}: {
-  envelope: Envelope
-  period: string
-}) {
-  const mutation = useSetEnvelopeTarget(period)
-  const [targetType, setTargetType] = useState<TargetType | "none">(
-    envelope.target?.type ?? "none"
-  )
-  const [amount, setAmount] = useState(envelope.target?.amount?.toString() ?? "")
-  const [deadline, setDeadline] = useState(envelope.target?.deadline ?? "")
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
-
-  const isPending = status === "loading"
-
-  async function handleSave() {
-    if (isPending) return
-    setStatus("loading")
-    try {
-      await mutation.mutateAsync({
-        envelopeId: envelope.id,
-        targetType: targetType === "none" ? null : targetType,
-        targetAmount: targetType !== "none" ? Number(amount) || 0 : null,
-        targetDeadline: targetType === "needed_by_date" ? deadline || null : null,
-      })
-      setStatus("success")
-      setTimeout(() => setStatus("idle"), 1500)
-    } catch {
-      setStatus("error")
-      setTimeout(() => setStatus("idle"), 2000)
-    }
-  }
-
-  return (
-    <div className="border-t border-border px-4 py-4">
-      <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-        Target
-      </p>
-      <div className="flex flex-col gap-2.5">
-        <select
-          value={targetType}
-          onChange={(e) => setTargetType(e.target.value as TargetType | "none")}
-          disabled={isPending}
-          className="h-8 rounded-lg border border-border bg-bg-muted px-2 text-[12.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
-        >
-          {TARGET_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-
-        {targetType !== "none" && (
-          <div className="flex flex-col gap-2">
-            <div>
-              <label className="text-[11px] text-text-muted">Amount (IDR)</label>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={isPending}
-                placeholder="0"
-                className="mt-0.5 h-8 w-full rounded-lg border border-border bg-bg-muted px-2 text-[12.5px] tabular-nums text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
-              />
-            </div>
-            {targetType === "needed_by_date" && (
-              <div>
-                <label className="text-[11px] text-text-muted">Deadline</label>
-                <input
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  disabled={isPending}
-                  className="mt-0.5 h-8 w-full rounded-lg border border-border bg-bg-muted px-2 text-[12.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        <button
-          onClick={handleSave}
-          disabled={isPending}
-          className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition-colors ${
-            status === "success"
-              ? "bg-[color:var(--success-light)] text-[color:var(--success)]"
-              : status === "error"
-                ? "bg-danger-light text-[color:var(--danger)]"
-                : isPending
-                  ? "cursor-not-allowed bg-bg-muted text-text-muted"
-                  : "bg-brand-light text-brand-text hover:brightness-95"
-          }`}
-        >
-          {status === "loading" ? (
-            <><Loader2 className="size-3.5 animate-spin" /> Saving…</>
-          ) : status === "success" ? (
-            <><Check className="size-3.5" /> Saved</>
-          ) : status === "error" ? (
-            "Failed — try again"
-          ) : (
-            "Save target"
-          )}
-        </button>
-      </div>
-    </div>
-  )
-}

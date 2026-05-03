@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import {
   DndContext,
   type DragEndEvent,
@@ -45,6 +47,7 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
   const reorderEnvelopes = useReorderEnvelopes(period)
   const reorderGroups = useReorderEnvelopeGroups(period)
   const assignEnvelope = useAssignEnvelope(period)
+  const isMobile = useIsMobile()
 
   const [overrides, setOverrides] = useState<Map<number, EnvelopeBudget>>(
     new Map()
@@ -336,7 +339,7 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
             >
               Ready to assign
             </p>
-            <p className="truncate text-[12.5px] text-text-secondary">
+            <p className="text-[12.5px] text-text-secondary">
               {readyToAssign > 0
                 ? "Give this money a job before planning is done."
                 : "Envelope assignments exceed your account balance."}
@@ -411,8 +414,8 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
 
       </div>
 
-      {/* Right detail panel — always visible */}
-      <div className="w-96 flex-shrink-0 border-l border-border bg-card">
+      {/* Desktop right panel */}
+      <div className="hidden w-96 flex-shrink-0 flex-col border-l border-border bg-card md:flex">
         <EnvelopeDetailPanel
           envelope={selectedItem?.envelope ?? null}
           budget={selectedItem?.budget ?? null}
@@ -426,6 +429,36 @@ export function EnvelopesPage({ showNominal }: { showNominal: boolean }) {
           onAssign={handleAssign}
         />
       </div>
+
+      {/* Mobile bottom sheet */}
+      <Sheet
+        open={isMobile && selectedEnvelopeId !== null}
+        onOpenChange={(open) => { if (!open) setSelectedEnvelopeId(null) }}
+      >
+        <SheetContent
+          side="bottom"
+          showCloseButton={false}
+          className="flex max-h-[85svh] flex-col overflow-hidden rounded-t-2xl p-0"
+        >
+          <div className="flex flex-shrink-0 justify-center pb-1 pt-3">
+            <div className="h-1 w-10 rounded-full bg-border" />
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <EnvelopeDetailPanel
+              envelope={selectedItem?.envelope ?? null}
+              budget={selectedItem?.budget ?? null}
+              period={period}
+              isPastPeriod={isPastPeriod}
+              onClose={() => setSelectedEnvelopeId(null)}
+              donors={donors}
+              onCover={handleCover}
+              readyToAssign={readyToAssign}
+              allItems={currentItems}
+              onAssign={handleAssign}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
