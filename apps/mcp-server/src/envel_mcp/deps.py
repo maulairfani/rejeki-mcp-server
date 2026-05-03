@@ -12,6 +12,9 @@ from envel_mcp.database import Database, init_db
 _db_path: ContextVar[str] = ContextVar("db_path")
 _db_username: ContextVar[str] = ContextVar("db_username")
 
+def _configure_sqlite(conn) -> None:
+    conn.execute("PRAGMA busy_timeout = 10000")
+
 
 def _derive_db_key(username: str) -> str | None:
     """Derive a per-user SQLCipher key from the master DB_ENCRYPTION_KEY.
@@ -49,19 +52,23 @@ def get_user_db():
     if key:
         try:
             import sqlcipher3
-            conn = sqlcipher3.connect(path)
+            conn = sqlcipher3.connect(path, timeout=10)
             conn.execute(f"PRAGMA key = '{key}'")
         except ImportError:
-            conn = sqlite3.connect(path)
+            conn = sqlite3.connect(path, timeout=10)
     else:
-        conn = sqlite3.connect(path)
+        conn = sqlite3.connect(path, timeout=10)
 
-    db = Database(conn)
-    init_db(db)
     try:
+        _configure_sqlite(conn)
+        db = Database(conn)
+        init_db(db)
         yield db
+    except Exception:
+        conn.rollback()
+        raise
     finally:
-        db.close()
+        conn.close()
 
 
 # ─── Morning briefing piggyback ─────────────────────────────────────────────

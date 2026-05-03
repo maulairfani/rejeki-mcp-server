@@ -23,9 +23,13 @@ class Database:
 
     def execute(self, query: str, params: tuple = ()) -> int:
         """Execute INSERT/UPDATE/DELETE. Returns lastrowid."""
-        cur = self._conn.execute(query, params)
-        self._conn.commit()
-        return cur.lastrowid
+        try:
+            cur = self._conn.execute(query, params)
+            self._conn.commit()
+            return cur.lastrowid
+        except Exception:
+            self._conn.rollback()
+            raise
 
     def close(self):
         self._conn.close()
@@ -33,10 +37,12 @@ class Database:
 
 def init_db(db: Database) -> None:
     schema = _SCHEMA_PATH.read_text(encoding="utf-8")
-    statements = [s.strip() for s in schema.split(";") if s.strip()]
-    for stmt in statements:
-        db._conn.execute(stmt)
-    db._conn.commit()
+    try:
+        db._conn.executescript(schema)
+        db._conn.commit()
+    except Exception:
+        db._conn.rollback()
+        raise
     _migrate(db)
 
 

@@ -6,6 +6,32 @@ import sqlite3
 
 _MIGRATED: set[str] = set()
 
+def _configure_sqlite(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA busy_timeout = 10000")
+
+def _prev_period(period: str) -> str:
+    year, month = map(int, period.split("-"))
+    if month == 1:
+        return f"{year - 1}-12"
+    return f"{year}-{month - 1:02d}"
+
+def _compute_carryover(conn: sqlite3.Connection, envelope_id: int, period: str) -> float:
+    prev_period = _prev_period(period)
+    prev = conn.execute(
+        "SELECT assigned, carryover FROM budget_periods WHERE envelope_id = ? AND period = ?",
+        (envelope_id, prev_period),
+    ).fetchone()
+    if not prev:
+        return 0.0
+
+    prev_activity = conn.execute(
+        """SELECT COALESCE(SUM(amount), 0) AS activity
+           FROM transactions
+           WHERE envelope_id = ? AND type = 'expense' AND strftime('%Y-%m', date) = ?""",
+        (envelope_id, prev_period),
+    ).fetchone()["activity"]
+    return prev["carryover"] + prev["assigned"] - prev_activity
+
 
 def _derive_db_key(username: str) -> str | None:
     """Derive a per-user SQLCipher key from the master DB_ENCRYPTION_KEY.
@@ -24,17 +50,30 @@ def _open_user_db(path: str, username: str) -> sqlite3.Connection:
     if key:
         try:
             import sqlcipher3
-            conn = sqlcipher3.connect(path)
-            conn.execute(f"PRAGMA key = '{key}'")
-            conn.row_factory = sqlite3.Row
-            _ensure_migrated(conn, path)
-            return conn
+            conn = sqlcipher3.connect(path, timeout=10)
         except ImportError:
             pass
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    _ensure_migrated(conn, path)
-    return conn
+        else:
+            try:
+                conn.execute(f"PRAGMA key = '{key}'")
+                _configure_sqlite(conn)
+                conn.row_factory = sqlite3.Row
+                _ensure_migrated(conn, path)
+                return conn
+            except Exception:
+                conn.rollback()
+                conn.close()
+                raise
+    conn = sqlite3.connect(path, timeout=10)
+    try:
+        _configure_sqlite(conn)
+        conn.row_factory = sqlite3.Row
+        _ensure_migrated(conn, path)
+        return conn
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
 
 
 def _ensure_migrated(conn: sqlite3.Connection, path: str) -> None:
@@ -137,7 +176,20 @@ def get_envelope_status(
     username: str, period: str, include_archived: bool = False
 ) -> list[dict]:
     archived_clause = "" if include_archived else " AND e.archived = 0"
+    prev_period = _prev_period(period)
     sql = f"""
+        WITH current_activity AS (
+            SELECT envelope_id, COALESCE(SUM(amount), 0) AS activity
+            FROM transactions
+            WHERE type = 'expense' AND strftime('%Y-%m', date) = ?
+            GROUP BY envelope_id
+        ),
+        previous_activity AS (
+            SELECT envelope_id, COALESCE(SUM(amount), 0) AS activity
+            FROM transactions
+            WHERE type = 'expense' AND strftime('%Y-%m', date) = ?
+            GROUP BY envelope_id
+        )
         SELECT
             e.id,
             e.name,
@@ -151,18 +203,22 @@ def get_envelope_status(
             e.target_amount,
             e.target_deadline,
             COALESCE(bp.assigned, 0) AS assigned,
-            COALESCE(bp.carryover, 0) AS carryover,
-            COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS activity
+            CASE
+                WHEN bp.id IS NOT NULL THEN bp.carryover
+                ELSE COALESCE(prev_bp.carryover + prev_bp.assigned - COALESCE(pa.activity, 0), 0)
+            END AS carryover,
+            COALESCE(ca.activity, 0) AS activity
         FROM envelopes e
         LEFT JOIN envelope_groups eg ON e.group_id = eg.id
         LEFT JOIN budget_periods bp ON bp.envelope_id = e.id AND bp.period = ?
-        LEFT JOIN transactions t ON t.envelope_id = e.id AND strftime('%Y-%m', t.date) = ?
+        LEFT JOIN budget_periods prev_bp ON prev_bp.envelope_id = e.id AND prev_bp.period = ?
+        LEFT JOIN current_activity ca ON ca.envelope_id = e.id
+        LEFT JOIN previous_activity pa ON pa.envelope_id = e.id
         WHERE e.type = 'expense'{archived_clause}
-        GROUP BY e.id
         ORDER BY COALESCE(eg.sort_order, 999), e.sort_order, e.name
     """
     with get_conn(username) as conn:
-        rows = conn.execute(sql, (period, period)).fetchall()
+        rows = conn.execute(sql, (period, prev_period, period, prev_period)).fetchall()
     result = []
     for r in rows:
         d = dict(r)
@@ -210,12 +266,15 @@ def reorder_envelope_groups(username: str, items: list[dict]) -> None:
 
 def assign_envelope(username: str, envelope_id: int, period: str, assigned: float) -> None:
     sql = """
-        INSERT INTO budget_periods (envelope_id, period, assigned)
-        VALUES (?, ?, ?)
+        INSERT INTO budget_periods (envelope_id, period, assigned, carryover)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(envelope_id, period) DO UPDATE SET assigned = excluded.assigned
     """
     with get_conn(username) as conn:
-        conn.execute(sql, (envelope_id, period, assigned))
+        conn.execute(
+            sql,
+            (envelope_id, period, assigned, _compute_carryover(conn, envelope_id, period)),
+        )
         conn.commit()
 
 
