@@ -10,6 +10,9 @@ import {
 interface AuthState {
   authenticated: boolean
   username: string | null
+  name: string | null
+  email: string | null
+  hasPassword: boolean
   loading: boolean
 }
 
@@ -32,6 +35,7 @@ interface AuthContextValue extends AuthState {
   signup: (input: SignupInput) => Promise<SignupResult>
   markAuthenticated: (username: string) => void
   logout: () => Promise<void>
+  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -59,8 +63,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     authenticated: false,
     username: null,
+    name: null,
+    email: null,
+    hasPassword: false,
     loading: true,
   })
+
+  const fetchSession = useCallback(async (): Promise<void> => {
+    try {
+      const res = await fetch("/api/auth/session", { credentials: "include" })
+      const data = await res.json()
+      setState({
+        authenticated: data.authenticated === true,
+        username: data.username ?? null,
+        name: data.name ?? null,
+        email: data.email ?? null,
+        hasPassword: data.has_password === true,
+        loading: false,
+      })
+    } catch {
+      setState({ authenticated: false, username: null, name: null, email: null, hasPassword: false, loading: false })
+    }
+  }, [])
 
   // Check existing session on mount
   useEffect(() => {
@@ -69,24 +93,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState({
         authenticated: !!saved,
         username: saved,
+        name: null,
+        email: null,
+        hasPassword: false,
         loading: false,
       })
       return
     }
 
-    fetch("/api/auth/session", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data) => {
-        setState({
-          authenticated: data.authenticated === true,
-          username: data.username ?? null,
-          loading: false,
-        })
-      })
-      .catch(() => {
-        setState({ authenticated: false, username: null, loading: false })
-      })
-  }, [])
+    fetchSession()
+  }, [fetchSession])
 
   const login = useCallback(
     async (
@@ -97,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await mockLogin(username, password)
         if (result.ok) {
           localStorage.setItem("envel-mock-user", username)
-          setState({ authenticated: true, username, loading: false })
+          setState({ authenticated: true, username, name: null, email: null, hasPassword: false, loading: false })
         }
         return result
       }
@@ -111,12 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
 
         if (res.ok) {
-          const data = await res.json()
-          setState({
-            authenticated: true,
-            username: data.username,
-            loading: false,
-          })
+          await fetchSession()
           return { ok: true }
         }
 
@@ -126,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: "Cannot connect to server" }
       }
     },
-    []
+    [fetchSession]
   )
 
   const signup = useCallback(async (input: SignupInput): Promise<SignupResult> => {
@@ -138,8 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(input),
       })
       if (res.ok) {
-        const data = await res.json()
-        setState({ authenticated: true, username: data.username, loading: false })
+        await fetchSession()
         return { ok: true }
       }
       const err = await res.json().catch(() => null)
@@ -152,16 +162,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return { ok: false, error: "Cannot connect to server" }
     }
-  }, [])
+  }, [fetchSession])
 
-  const markAuthenticated = useCallback((username: string) => {
-    setState({ authenticated: true, username, loading: false })
-  }, [])
+  const markAuthenticated = useCallback(
+    (username: string) => {
+      setState((s) => ({ ...s, authenticated: true, username, loading: false }))
+      fetchSession()
+    },
+    [fetchSession]
+  )
 
   const logout = useCallback(async () => {
     if (MOCK_MODE) {
       localStorage.removeItem("envel-mock-user")
-      setState({ authenticated: false, username: null, loading: false })
+      setState({ authenticated: false, username: null, name: null, email: null, hasPassword: false, loading: false })
       return
     }
 
@@ -169,11 +183,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "POST",
       credentials: "include",
     }).catch(() => {})
-    setState({ authenticated: false, username: null, loading: false })
+    setState({ authenticated: false, username: null, name: null, email: null, hasPassword: false, loading: false })
   }, [])
 
   return (
-    <AuthContext.Provider value={{ ...state, login, signup, markAuthenticated, logout }}>
+    <AuthContext.Provider
+      value={{ ...state, login, signup, markAuthenticated, logout, refreshSession: fetchSession }}
+    >
       {children}
     </AuthContext.Provider>
   )

@@ -71,6 +71,135 @@ def check_credentials(username: str, password: str) -> bool:
     return True
 
 
+def update_user_profile(
+    username: str,
+    name: str | None = None,
+    email: str | None = None,
+) -> dict:
+    """Update the user's display name and/or email. Returns updated profile.
+
+    Raises SignupError on validation failure or duplicate email.
+    """
+    fields: list[str] = []
+    params: list[object] = []
+
+    if name is not None:
+        cleaned_name = name.strip()
+        if not cleaned_name:
+            raise SignupError("Name cannot be empty.", field="name", code="required")
+        fields.append("name = ?")
+        params.append(cleaned_name)
+
+    if email is not None:
+        cleaned_email = email.strip().lower()
+        if not EMAIL_RE.match(cleaned_email):
+            raise SignupError(
+                "Please enter a valid email address.", field="email", code="invalid_format"
+            )
+        conn = _connect_users_db()
+        try:
+            existing = conn.execute(
+                "SELECT username FROM users WHERE email = ? AND username != ? LIMIT 1",
+                (cleaned_email, username),
+            ).fetchone()
+            if existing:
+                raise SignupError(
+                    "An account with this email already exists.",
+                    field="email",
+                    code="taken",
+                )
+        finally:
+            conn.close()
+        fields.append("email = ?")
+        params.append(cleaned_email)
+
+    if not fields:
+        profile = get_user_profile(username)
+        if not profile:
+            raise SignupError("User not found.", code="not_found")
+        return profile
+
+    params.append(username)
+    conn = _connect_users_db()
+    try:
+        conn.execute(f"UPDATE users SET {', '.join(fields)} WHERE username = ?", tuple(params))
+        conn.commit()
+    finally:
+        conn.close()
+
+    profile = get_user_profile(username)
+    if not profile:
+        raise SignupError("User not found.", code="not_found")
+    logger.info("profile_updated", extra={"username": username})
+    return profile
+
+
+def change_user_password(
+    username: str, current_password: str | None, new_password: str
+) -> None:
+    """Set a new password for the user.
+
+    If the user already has a password, current_password must verify (change flow).
+    If the user has no password yet (Google-only signup), current_password is ignored
+    and we just set the new password (set-password flow).
+
+    Raises SignupError on failure.
+    """
+    profile = get_user_profile(username)
+    if not profile:
+        raise SignupError("User not found.", code="not_found")
+
+    if profile["has_password"]:
+        if not current_password or not check_credentials(username, current_password):
+            raise SignupError(
+                "Current password is incorrect.", field="current_password", code="invalid"
+            )
+
+    if len(new_password) < PASSWORD_MIN_LEN:
+        raise SignupError(
+            f"Password must be at least {PASSWORD_MIN_LEN} characters.",
+            field="new_password",
+            code="too_short",
+        )
+    if not re.search(r"[A-Za-z]", new_password) or not re.search(r"\d", new_password):
+        raise SignupError(
+            "Password must contain at least one letter and one number.",
+            field="new_password",
+            code="too_weak",
+        )
+
+    new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+    conn = _connect_users_db()
+    try:
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE username = ?", (new_hash, username)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    logger.info("password_changed", extra={"username": username})
+
+
+def get_user_profile(username: str) -> dict | None:
+    try:
+        conn = _connect_users_db()
+        row = conn.execute(
+            "SELECT username, name, email, password_hash FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+        conn.close()
+    except Exception:
+        return None
+    if not row:
+        return None
+    return {
+        "username": row["username"],
+        "name": row["name"],
+        "email": row["email"],
+        "has_password": bool(row["password_hash"]),
+    }
+
+
 def username_available(username: str) -> bool:
     if not USERNAME_RE.match(username):
         return False

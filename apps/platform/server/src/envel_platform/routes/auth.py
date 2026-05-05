@@ -8,8 +8,11 @@ from pydantic import BaseModel
 
 from envel_platform.auth import (
     SignupError,
+    change_user_password,
     check_credentials,
     create_user,
+    get_user_profile,
+    update_user_profile,
     username_available,
 )
 
@@ -214,6 +217,46 @@ async def connection_status(request: Request):
     return JSONResponse({"detail": "Auth server unavailable"}, status_code=502)
 
 
+class UpdateProfileRequest(BaseModel):
+    name: str | None = None
+    email: str | None = None
+
+
+@router.patch("/me")
+async def update_me(body: UpdateProfileRequest, request: Request):
+    username = request.session.get("username")
+    if not username:
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+    try:
+        profile = update_user_profile(username, name=body.name, email=body.email)
+    except SignupError as e:
+        return JSONResponse(
+            {"detail": e.message, "field": e.field, "code": e.code},
+            status_code=409 if e.code == "taken" else 400,
+        )
+    return profile
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str | None = None
+    new_password: str
+
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordRequest, request: Request):
+    username = request.session.get("username")
+    if not username:
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+    try:
+        change_user_password(username, body.current_password, body.new_password)
+    except SignupError as e:
+        return JSONResponse(
+            {"detail": e.message, "field": e.field, "code": e.code},
+            status_code=400,
+        )
+    return {"ok": True}
+
+
 @router.post("/logout")
 async def logout(request: Request):
     request.session.clear()
@@ -225,4 +268,11 @@ async def session(request: Request):
     username = request.session.get("username")
     if not username:
         return JSONResponse({"authenticated": False}, status_code=401)
-    return {"authenticated": True, "username": username}
+    profile = get_user_profile(username)
+    return {
+        "authenticated": True,
+        "username": username,
+        "name": profile.get("name") if profile else None,
+        "email": profile.get("email") if profile else None,
+        "has_password": profile.get("has_password") if profile else False,
+    }

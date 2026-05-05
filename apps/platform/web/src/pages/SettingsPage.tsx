@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
-import { RefreshCw, Unlink } from "lucide-react"
+import { useSearchParams } from "react-router-dom"
+import { RefreshCw, Unlink, User } from "lucide-react"
 import { useBackupStatus, useTriggerBackup } from "@/hooks/useBackup"
 import {
   useMorningBriefing,
@@ -7,8 +8,18 @@ import {
 } from "@/hooks/useMorningBriefing"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
+import { useAuth } from "@/hooks/useAuth"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { Badge } from "@/components/shared/Badge"
+import { cn } from "@/lib/utils"
+
+const TABS = [
+  { id: "account", label: "Account" },
+  { id: "briefing", label: "Briefing" },
+  { id: "backup", label: "Backup" },
+] as const
+
+type TabId = (typeof TABS)[number]["id"]
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "Never"
@@ -22,6 +33,82 @@ function formatDate(iso: string | null | undefined) {
 }
 
 export function SettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawTab = searchParams.get("tab")
+  const tab: TabId = (TABS.find((t) => t.id === rawTab)?.id ?? "account")
+  const setTab = (next: TabId) => setSearchParams({ tab: next }, { replace: true })
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <PageHeader title="Settings" hideAmountsBadge />
+
+      {/* Mobile tab bar */}
+      <div
+        role="tablist"
+        aria-label="Settings sections"
+        className="flex shrink-0 gap-1 border-b border-border px-4 md:hidden"
+      >
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "relative -mb-px px-3 py-2.5 text-[13px] font-semibold transition-colors",
+              tab === t.id
+                ? "text-text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:rounded-t-full after:bg-brand"
+                : "text-text-muted hover:text-text-secondary",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop left nav */}
+        <nav
+          role="tablist"
+          aria-label="Settings sections"
+          className="hidden w-48 shrink-0 flex-col gap-0.5 border-r border-border px-3 py-5 md:flex"
+        >
+          <p className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+            Settings
+          </p>
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "relative flex h-8 w-full items-center rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                tab === t.id
+                  ? "bg-brand/10 text-brand before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-brand"
+                  : "text-text-secondary hover:bg-bg-muted hover:text-text-primary",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7">
+          <div className="mx-auto max-w-xl">
+            {tab === "account" && <AccountCard />}
+            {tab === "briefing" && <MorningBriefingCard />}
+            {tab === "backup" && <BackupCard />}
+          </div>
+          <div className="h-10" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BackupCard() {
   const { data: status, isLoading } = useBackupStatus()
   const triggerBackup = useTriggerBackup()
   const queryClient = useQueryClient()
@@ -32,19 +119,8 @@ export function SettingsPage() {
   })
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <PageHeader title="Settings" hideAmountsBadge />
-
-      <div className="flex-1 overflow-y-auto px-7 py-7">
-        <div className="max-w-xl">
-          <h2 className="font-heading text-[17px] font-bold text-text-primary">
-            Settings
-          </h2>
-          <p className="mt-1 text-sm text-text-muted">
-            Manage your account preferences
-          </p>
-
-          {/* Google Drive Backup Card */}
+    <>
+      {/* Google Drive Backup Card */}
           <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-xs">
             <div className="mb-4 flex items-start gap-3.5">
               <div
@@ -153,12 +229,7 @@ export function SettingsPage() {
               </>
             )}
           </div>
-
-          <MorningBriefingCard />
-        </div>
-        <div className="h-10" />
-      </div>
-    </div>
+    </>
   )
 }
 
@@ -275,6 +346,250 @@ function MorningBriefingCard() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+interface UserProfile {
+  username: string
+  name: string | null
+  email: string | null
+}
+
+function AccountCard() {
+  const { username, name, email, hasPassword, refreshSession } = useAuth()
+
+  const [draftName, setDraftName] = useState(name ?? "")
+  const [draftEmail, setDraftEmail] = useState(email ?? "")
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [profileSavedAt, setProfileSavedAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    setDraftName(name ?? "")
+  }, [name])
+  useEffect(() => {
+    setDraftEmail(email ?? "")
+  }, [email])
+
+  const updateProfile = useMutation({
+    mutationFn: (body: { name?: string; email?: string }) =>
+      api<UserProfile>("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: async () => {
+      setProfileError(null)
+      setProfileSavedAt(Date.now())
+      await refreshSession()
+    },
+    onError: (err: Error) => setProfileError(err.message),
+  })
+
+  const profileDirty =
+    (draftName.trim() !== (name ?? "")) || (draftEmail.trim().toLowerCase() !== (email ?? ""))
+
+  const handleProfileSave = () => {
+    setProfileError(null)
+    const body: { name?: string; email?: string } = {}
+    if (draftName.trim() !== (name ?? "")) body.name = draftName.trim()
+    if (draftEmail.trim().toLowerCase() !== (email ?? "")) body.email = draftEmail.trim()
+    if (Object.keys(body).length === 0) return
+    updateProfile.mutate(body)
+  }
+
+  // Password form
+  const [currentPw, setCurrentPw] = useState("")
+  const [newPw, setNewPw] = useState("")
+  const [confirmPw, setConfirmPw] = useState("")
+  const [pwError, setPwError] = useState<string | null>(null)
+  const [pwSavedAt, setPwSavedAt] = useState<number | null>(null)
+
+  const changePassword = useMutation({
+    mutationFn: (body: { current_password: string | null; new_password: string }) =>
+      api<{ ok: true }>("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: async () => {
+      setPwError(null)
+      setPwSavedAt(Date.now())
+      setCurrentPw("")
+      setNewPw("")
+      setConfirmPw("")
+      await refreshSession()
+    },
+    onError: (err: Error) => setPwError(err.message),
+  })
+
+  const handlePasswordSave = () => {
+    setPwError(null)
+    if (hasPassword && !currentPw) {
+      setPwError("Please enter your current password.")
+      return
+    }
+    if (!newPw) {
+      setPwError("Please enter a new password.")
+      return
+    }
+    if (newPw !== confirmPw) {
+      setPwError("New password and confirmation don't match.")
+      return
+    }
+    changePassword.mutate({
+      current_password: hasPassword ? currentPw : null,
+      new_password: newPw,
+    })
+  }
+
+  const inputClass =
+    "w-full rounded-md border border-border bg-bg px-3 py-2 text-[13px] text-text-primary placeholder:text-text-placeholder focus:border-brand focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-xs">
+      <div className="mb-4 flex items-start gap-3.5">
+        <div
+          className="flex size-10 items-center justify-center rounded-lg text-text-secondary"
+          style={{ background: "oklch(94% 0.05 145 / 0.4)" }}
+        >
+          <User className="size-5" />
+        </div>
+        <div>
+          <p className="font-heading text-sm font-bold text-text-primary">Account</p>
+          <p className="text-[12.5px] text-text-muted">
+            Update your display name, email, and password
+          </p>
+        </div>
+      </div>
+
+      {/* Username (read-only) */}
+      <div className="mb-3.5">
+        <label className="mb-1 block text-[12.5px] font-semibold text-text-secondary">
+          Username
+        </label>
+        <input value={username ?? ""} disabled className={inputClass} />
+        <p className="mt-1 text-[11.5px] text-text-muted">
+          Username can't be changed.
+        </p>
+      </div>
+
+      {/* Display name */}
+      <div className="mb-3.5">
+        <label className="mb-1 block text-[12.5px] font-semibold text-text-secondary">
+          Display name
+        </label>
+        <input
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          className={inputClass}
+        />
+      </div>
+
+      {/* Email */}
+      <div className="mb-3.5">
+        <label className="mb-1 block text-[12.5px] font-semibold text-text-secondary">
+          Email
+        </label>
+        <input
+          type="email"
+          value={draftEmail}
+          onChange={(e) => setDraftEmail(e.target.value)}
+          className={inputClass}
+        />
+      </div>
+
+      <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          disabled={!profileDirty || updateProfile.isPending}
+          onClick={handleProfileSave}
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {updateProfile.isPending ? "Saving…" : "Save profile"}
+        </button>
+        {profileSavedAt && !profileDirty && !updateProfile.isPending && (
+          <span className="text-[12px] text-[color:var(--success)]">Saved.</span>
+        )}
+      </div>
+      {profileError && (
+        <p className="mt-2 text-[12px] text-[color:var(--danger)]">{profileError}</p>
+      )}
+
+      <div className="my-5 border-t border-border" />
+
+      {/* Password */}
+      <p className="mb-1 text-[13px] font-semibold text-text-primary">
+        {hasPassword ? "Change password" : "Set a password"}
+      </p>
+      {!hasPassword && (
+        <p className="mb-3 text-[12px] text-text-muted">
+          You signed in with Google. Setting a password lets you sign in with your username and
+          password too.
+        </p>
+      )}
+
+      {hasPassword && (
+        <div className="mb-3.5">
+          <label className="mb-1 block text-[12.5px] font-semibold text-text-secondary">
+            Current password
+          </label>
+          <input
+            type="password"
+            value={currentPw}
+            onChange={(e) => setCurrentPw(e.target.value)}
+            autoComplete="current-password"
+            className={inputClass}
+          />
+        </div>
+      )}
+      <div className="mb-3.5">
+        <label className="mb-1 block text-[12.5px] font-semibold text-text-secondary">
+          New password
+        </label>
+        <input
+          type="password"
+          value={newPw}
+          onChange={(e) => setNewPw(e.target.value)}
+          autoComplete="new-password"
+          className={inputClass}
+        />
+        <p className="mt-1 text-[11.5px] text-text-muted">
+          At least 8 characters, with one letter and one number.
+        </p>
+      </div>
+      <div className="mb-3.5">
+        <label className="mb-1 block text-[12.5px] font-semibold text-text-secondary">
+          Confirm new password
+        </label>
+        <input
+          type="password"
+          value={confirmPw}
+          onChange={(e) => setConfirmPw(e.target.value)}
+          autoComplete="new-password"
+          className={inputClass}
+        />
+      </div>
+      <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          disabled={changePassword.isPending}
+          onClick={handlePasswordSave}
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {changePassword.isPending
+            ? hasPassword
+              ? "Updating…"
+              : "Saving…"
+            : hasPassword
+              ? "Update password"
+              : "Set password"}
+        </button>
+        {pwSavedAt && !changePassword.isPending && (
+          <span className="text-[12px] text-[color:var(--success)]">
+            {hasPassword ? "Password updated." : "Password set."}
+          </span>
+        )}
+      </div>
+      {pwError && <p className="mt-2 text-[12px] text-[color:var(--danger)]">{pwError}</p>}
     </div>
   )
 }

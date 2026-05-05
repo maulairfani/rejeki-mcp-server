@@ -1,11 +1,9 @@
 import {
   BadgeCheck,
-  Bell,
-  ChevronsUpDown,
-  CreditCard,
   LogOut,
   Monitor,
   Moon,
+  MoreHorizontal,
   Palette,
   Sun,
 } from "lucide-react"
@@ -37,6 +35,7 @@ import {
 } from "@/components/ui/sidebar"
 import type { Theme } from "@/hooks/useTheme"
 import { useAuth } from "@/hooks/useAuth"
+import { useNavigate } from "react-router-dom"
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: React.ReactNode }[] = [
   { value: "light", label: "Light", icon: <Sun className="size-4" /> },
@@ -55,6 +54,11 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  const goToAccount = () => {
+    navigate("/settings?tab=account")
+  }
 
   return (
     <SidebarMenu>
@@ -76,7 +80,7 @@ export function NavUser({
               <span className="truncate font-medium">{user.name}</span>
               <span className="truncate text-xs">{user.email}</span>
             </div>
-            <ChevronsUpDown className="ml-auto size-4" />
+            <MoreHorizontal className="ml-auto size-4 text-text-muted" aria-label="Open user menu" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
@@ -122,17 +126,9 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={goToAccount}>
                 <BadgeCheck />
                 Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bell />
-                Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
